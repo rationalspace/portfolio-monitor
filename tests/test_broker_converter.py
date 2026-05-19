@@ -12,7 +12,7 @@ from pathlib import Path
 
 import pytest
 
-from portfolio_monitor.scripts.fidelity_to_ghostfolio import (
+from portfolio_monitor.scripts.broker_to_ghostfolio import (
     ACTION_MAP,
     classify_action,
     convert,

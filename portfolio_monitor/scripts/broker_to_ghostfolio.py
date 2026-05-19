@@ -16,7 +16,7 @@ Fidelity export → Ghostfolio CSV mapping:
 
 Usage::
 
-    python -m portfolio_monitor.scripts.fidelity_to_ghostfolio \\
+    python -m portfolio_monitor.scripts.broker_to_ghostfolio \\
         ~/Downloads/Accounts_History.csv \\
         --output ghostfolio_import.csv \\
         --account-map "<YOUR_ACCOUNT_1>=<ghostfolio-acct-uuid>" \\

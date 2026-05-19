@@ -5,7 +5,7 @@ build-backend = "hatchling.build"
 [project]
 name = "portfolio-monitor"
 version = "0.1.0"
-description = "Tier-aware portfolio alert system for a Fidelity book."
+description = "Tier-aware portfolio alert system for a brokerage account."
 requires-python = ">=3.11"
 authors = [{ name = "Mandeep" }]
 dependencies = [

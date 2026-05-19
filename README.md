@@ -3,7 +3,7 @@
 Tier-aware alert system for a brokerage account, running locally on macOS.
 Designed to *protect compounders, trim near all-time highs, prune laggards on rallies, and dip-buy quality* — not to chase momentum.
 
-Connects to your brokerage via [SnapTrade](https://snaptrade.com) (supports 50+ brokers including Fidelity, Schwab, TD Ameritrade, and others).
+Connects to your brokerage via [SnapTrade](https://snaptrade.com) (supports 50+ brokers).
 
 ## Architecture
 
@@ -172,7 +172,7 @@ docker compose up -d          # starts Ghostfolio + Postgres + Redis at localhos
 ### Brokerage CSV → Ghostfolio import
 
 ```bash
-python -m portfolio_monitor.scripts.fidelity_to_ghostfolio \
+python -m portfolio_monitor.scripts.broker_to_ghostfolio \
   input.csv output.csv \
   --account-map "<YOUR_ACCOUNT_1>=ghostfolio-account-id-1" \
   --account-map "<YOUR_ACCOUNT_2>=ghostfolio-account-id-2"
@@ -212,7 +212,7 @@ portfolio-monitor/
 │   │   └── digest.html.j2      # Weekly Saturday digest
 │   └── scripts/
 │       ├── run_guarded.py      # Time-gate + sentinel → main.run_once()
-│       └── fidelity_to_ghostfolio.py
+│       └── broker_to_ghostfolio.py
 └── tests/                      # Tests, no network required
 ```
 
