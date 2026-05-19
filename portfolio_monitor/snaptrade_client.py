@@ -6,7 +6,7 @@ the data normalized into :mod:`portfolio_types`.
 
 The SnapTrade Python SDK exposes far more than we use; this wrapper deliberately
 keeps the surface area small. If/when we need order placement (we don't —
-SnapTrade Broker is read-only anyway), additional methods can be added.
+SnapTrade brokerage connection is read-only anyway), additional methods can be added.
 """
 
 from __future__ import annotations
@@ -24,11 +24,11 @@ log = logging.getLogger(__name__)
 # Broker positions that are cash or money-market, not equities.
 # yfinance has no data for these and they should never be evaluated by rules.
 _NON_EQUITY_SYMBOLS: frozenset[str] = frozenset({
-    "SPAXX",   # Broker Government Money Market
-    "FDRXX",   # Broker Government Cash Reserves
-    "FZFXX",   # Broker Treasury Money Market
-    "FCASH",   # Broker cash core position
-    "FMPXX",   # Broker Prime Money Market
+    "SPAXX",   # Government Money Market
+    "FDRXX",   # Government Cash Reserves
+    "FZFXX",   # Treasury Money Market
+    "FCASH",   # Brokerage cash core position
+    "FMPXX",   # Prime Money Market
     "CORE",    # Generic "core" cash label some brokers use
 })
 
@@ -59,7 +59,7 @@ class SnapTradeClient:
     # ------------------------------------------------------------------ public
 
     def fetch_portfolio(self) -> Portfolio:
-        """Pull current holdings + transactions for every linked Broker account.
+        """Pull current holdings + transactions for every linked brokerage account.
 
         Returns a unified :class:`Portfolio` covering all accounts. The rule engine
         treats this as read-only — no mutation, no trade placement.
@@ -136,7 +136,7 @@ class SnapTradeClient:
         for accounts created after April 25, 2026. New free-tier accounts get
         ``410 Gone`` here. The system handles that gracefully — without
         transactions we just don't have per-lot acquisition dates from
-        SnapTrade. Import Broker's own transaction CSV into Ghostfolio
+        SnapTrade. Import your brokerage's transaction CSV into Ghostfolio
         instead (see scripts/broker_to_ghostfolio.py) for accurate lot dates.
         """
         try:

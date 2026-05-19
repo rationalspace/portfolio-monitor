@@ -3,7 +3,7 @@
 Tier-aware alert system for a brokerage account, running locally on macOS.
 Designed to *protect compounders, trim near all-time highs, prune laggards on rallies, and dip-buy quality* — not to chase momentum.
 
-Connects to your brokerage via [SnapTrade](https://snaptrade.com) (supports 50+ brokers including Broker, Schwab, TD Ameritrade, and others).
+Connects to your brokerage via [SnapTrade](https://snaptrade.com) (supports 50+ brokers).
 
 ## Architecture
 
