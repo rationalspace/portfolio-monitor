@@ -1,4 +1,4 @@
-# Portfolio Monitor (US — Fidelity)
+# Portfolio Monitor (Fidelity)
 
 Tier-aware portfolio alert system for a Fidelity brokerage account, running locally on macOS.
 Designed to *protect compounders, trim near all-time highs, prune laggards on rallies, and dip-buy quality* — not to chase momentum.
