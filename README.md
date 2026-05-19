@@ -1,4 +1,4 @@
-# Portfolio Monitor (US — Broker)
+# Portfolio Monitor (Broker)
 
 Tier-aware portfolio alert system for a Broker brokerage account, running locally on macOS.
 Designed to *protect compounders, trim near all-time highs, prune laggards on rallies, and dip-buy quality* — not to chase momentum.
