@@ -1,0 +1,185 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{{ alert.title }}</title>
+</head>
+<body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #f7f7f7; margin: 0; padding: 20px;">
+  <div style="max-width: 600px; margin: 0 auto; background: #fff; border-radius: 8px; padding: 24px; box-shadow: 0 2px 8px rgba(0,0,0,.06);">
+
+    <div style="display: inline-block; padding: 4px 10px; border-radius: 4px; color: #fff; font-size: 12px; font-weight: 600; background: {% if severity == 'high' %}#c0392b{% elif severity == 'medium' %}#d68910{% else %}#34495e{% endif %};">
+      {{ severity|upper }}
+    </div>
+    <span style="margin-left: 8px; font-size: 12px; color: #888;">{{ alert.rule.replace('_', ' ')|title }}</span>
+
+    <h1 style="margin: 12px 0 8px; font-size: 22px; color: #2c3e50;">{{ alert.title }}</h1>
+    <p style="margin: 0 0 16px; color: #555;">{{ alert.body }}</p>
+
+    {# Position context block — present for sell-into-strength and capitulation #}
+    {% set p = alert.payload %}
+    {% if p.market_value is defined and p.market_value %}
+    <table style="width: 100%; border-collapse: collapse; margin-bottom: 16px; font-size: 14px;">
+      {% if p.day_return_pct is defined and p.day_return_pct is not none %}
+      <tr>
+        <td style="padding: 6px 0; color: #888;">Day change</td>
+        <td style="padding: 6px 0; text-align: right; font-weight: 600;
+             color: {% if p.day_return_pct >= 0 %}#27ae60{% else %}#c0392b{% endif %};">
+          {{ "{:+.2%}".format(p.day_return_pct) }}
+          {% if p.day_value_change is defined and p.day_value_change is not none %}
+          &nbsp;·&nbsp;${{ "{:+,.0f}".format(p.day_value_change) }}
+          {% endif %}
+        </td>
+      </tr>
+      {% endif %}
+      <tr>
+        <td style="padding: 6px 0; color: #888;">Position value</td>
+        <td style="padding: 6px 0; text-align: right; font-weight: 600;">${{ "{:,.0f}".format(p.market_value) }}</td>
+      </tr>
+      {% if p.cost_basis is defined %}
+      <tr>
+        <td style="padding: 6px 0; color: #888;">Cost basis</td>
+        <td style="padding: 6px 0; text-align: right;">${{ "{:,.0f}".format(p.cost_basis) }}</td>
+      </tr>
+      {% endif %}
+      {% if p.unrealized_pl_pct is defined %}
+      <tr>
+        <td style="padding: 6px 0; color: #888;">Unrealized P&amp;L</td>
+        <td style="padding: 6px 0; text-align: right; color: {% if p.unrealized_pl_pct < 0 %}#c0392b{% else %}#27ae60{% endif %}; font-weight: 600;">
+          {{ "{:+.0%}".format(p.unrealized_pl_pct) }} ({{ "{:+,.0f}".format(p.unrealized_pl) }})
+        </td>
+      </tr>
+      {% endif %}
+      {% if p.price is defined %}
+      <tr>
+        <td style="padding: 6px 0; color: #888;">Last price</td>
+        <td style="padding: 6px 0; text-align: right;">${{ "{:,.2f}".format(p.price) }}</td>
+      </tr>
+      {% endif %}
+    </table>
+    {% endif %}
+
+    {# Triggers list — used by sell-into-strength #}
+    {% if p.triggers is defined and p.triggers %}
+    <h3 style="font-size: 14px; color: #2c3e50; margin: 16px 0 6px;">Triggers</h3>
+    <ul style="margin: 0; padding-left: 20px; color: #555;">
+      {% for t in p.triggers %}
+      <li>{{ t }}</li>
+      {% endfor %}
+    </ul>
+    {% endif %}
+
+    {# Deterioration signals — used by capitulation, weakness rules #}
+    {% if p.deterioration_signals is defined and p.deterioration_signals %}
+    <h3 style="font-size: 14px; color: #2c3e50; margin: 16px 0 6px;">Fundamentals deteriorating</h3>
+    <ul style="margin: 0; padding-left: 20px; color: #555;">
+      {% for s in p.deterioration_signals %}
+      <li>{{ s }}</li>
+      {% endfor %}
+    </ul>
+    {% endif %}
+
+    {# Buy-the-dip stats #}
+    {% if p.off_high_pct is defined %}
+    <h3 style="font-size: 14px; color: #2c3e50; margin: 16px 0 6px;">Dip metrics</h3>
+    <table style="width: 100%; border-collapse: collapse; font-size: 14px;">
+      <tr><td style="color:#888;">Price</td><td style="text-align:right;">${{ "{:,.2f}".format(p.price) }}</td></tr>
+      <tr><td style="color:#888;">52w high</td><td style="text-align:right;">${{ "{:,.2f}".format(p.fifty_two_week_high) }}</td></tr>
+      <tr><td style="color:#888;">Off high</td><td style="text-align:right; color:#c0392b;">{{ "{:.0%}".format(p.off_high_pct) }}</td></tr>
+      {% if p.rsi_14 is defined %}
+      <tr><td style="color:#888;">RSI(14)</td><td style="text-align:right;">{{ "{:.0f}".format(p.rsi_14) }}</td></tr>
+      {% endif %}
+    </table>
+    {% endif %}
+
+    {# ATH proximity stats — ath_proximity rule #}
+    {% if p.ath is defined and p.ath %}
+    <table style="width: 100%; border-collapse: collapse; margin-bottom: 16px; font-size: 14px;">
+      <tr>
+        <td style="padding: 6px 0; color: #888;">Current price</td>
+        <td style="padding: 6px 0; text-align: right; font-weight: 700;">${{ "{:,.2f}".format(p.price) }}</td>
+      </tr>
+      <tr>
+        <td style="padding: 6px 0; color: #888;">All-time high</td>
+        <td style="padding: 6px 0; text-align: right;">
+          ${{ "{:,.2f}".format(p.ath) }}
+          <span style="margin-left: 6px; color: #e67e22; font-weight: 600;">{{ "{:.0%}".format(p.ath_pct) }} of ATH</span>
+        </td>
+      </tr>
+      {% if p.fifty_two_week_high is defined and p.fifty_two_week_high %}
+      <tr>
+        <td style="padding: 6px 0; color: #888;">52-week high</td>
+        <td style="padding: 6px 0; text-align: right; color: #888;">${{ "{:,.2f}".format(p.fifty_two_week_high) }}</td>
+      </tr>
+      {% endif %}
+      <tr>
+        <td style="padding: 6px 0; color: #888;">Gap to ATH</td>
+        <td style="padding: 6px 0; text-align: right; color: #888;">${{ "{:,.2f}".format(p.gap_to_ath) }} per share</td>
+      </tr>
+    </table>
+    {% endif %}
+
+    {# Lot breakdown — exit_watchlist rule #}
+    {% if p.lots is defined and p.lots %}
+    <h3 style="font-size: 14px; color: #2c3e50; margin: 20px 0 8px;">Tax lot breakdown</h3>
+    {% if p.has_lt_profitable_lots %}
+    <div style="background: #e8f5e9; border-left: 4px solid #27ae60; padding: 10px 14px; border-radius: 4px; font-size: 13px; color: #1b5e20; margin-bottom: 10px;">
+      <strong>{{ p.lt_profitable_qty | int }} long-term profitable shares</strong> available to sell LTCG-eligible —
+      estimated gain <strong>${{ "{:+,.0f}".format(p.lt_profitable_gain) }}</strong>
+    </div>
+    {% endif %}
+    <table style="width: 100%; border-collapse: collapse; font-size: 13px; margin-bottom: 16px;">
+      <thead>
+        <tr style="background: #f5f5f5; color: #555;">
+          <th style="padding: 6px 8px; text-align: left; font-weight: 600;">Acquired</th>
+          <th style="padding: 6px 8px; text-align: right; font-weight: 600;">Shares</th>
+          <th style="padding: 6px 8px; text-align: right; font-weight: 600;">Cost</th>
+          <th style="padding: 6px 8px; text-align: right; font-weight: 600;">Gain/sh</th>
+          <th style="padding: 6px 8px; text-align: right; font-weight: 600;">Total gain</th>
+          <th style="padding: 6px 8px; text-align: center; font-weight: 600;">Type</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for lot in p.lots %}
+        <tr style="border-bottom: 1px solid #eee; {% if lot.is_long_term and lot.is_profitable %}background: #f9fff9;{% elif not lot.is_profitable %}background: #fff8f8;{% endif %}">
+          <td style="padding: 6px 8px; color: #555;">{{ lot.acquired_on }} <span style="color:#aaa; font-size:11px;">({{ lot.days_held }}d)</span></td>
+          <td style="padding: 6px 8px; text-align: right;">{{ "{:,.0f}".format(lot.quantity) }}</td>
+          <td style="padding: 6px 8px; text-align: right; color: #888;">${{ "{:,.2f}".format(lot.cost_per_share) }}</td>
+          <td style="padding: 6px 8px; text-align: right; font-weight: 600;
+               color: {% if lot.gain_per_share >= 0 %}#27ae60{% else %}#c0392b{% endif %};">
+            ${{ "{:+,.2f}".format(lot.gain_per_share) }} ({{ "{:+.0%}".format(lot.gain_pct) }})
+          </td>
+          <td style="padding: 6px 8px; text-align: right; font-weight: 700;
+               color: {% if lot.gain_total >= 0 %}#27ae60{% else %}#c0392b{% endif %};">
+            ${{ "{:+,.0f}".format(lot.gain_total) }}
+          </td>
+          <td style="padding: 6px 8px; text-align: center;">
+            {% if lot.is_long_term %}
+            <span style="background: #e8f5e9; color: #2e7d32; padding: 2px 6px; border-radius: 3px; font-size: 11px; font-weight: 600;">LONG TERM</span>
+            {% else %}
+            <span style="background: #fff3e0; color: #e65100; padding: 2px 6px; border-radius: 3px; font-size: 11px;">short term</span>
+            {% endif %}
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    {% endif %}
+
+    {# Headlines #}
+    {% if p.headlines is defined and p.headlines %}
+    <h3 style="font-size: 14px; color: #2c3e50; margin: 16px 0 6px;">Recent headlines</h3>
+    <ul style="margin: 0; padding-left: 20px; color: #555;">
+      {% for h in p.headlines[:3] %}
+      <li><a href="{{ h.url or '#' }}" style="color: #2980b9;">{{ h.title }}</a> <span style="color:#aaa;">— {{ h.publisher or '' }}</span></li>
+      {% endfor %}
+    </ul>
+    {% endif %}
+
+    <div style="margin-top: 24px; padding-top: 16px; border-top: 1px solid #eee; font-size: 12px; color: #999;">
+      Portfolio Monitor · {{ alert.fired_at.strftime('%Y-%m-%d %H:%M UTC') }} · Tier: {{ p.tier or 'n/a' }}
+      <br>This is an alert, not advice. Review tier assignments quarterly.
+    </div>
+  </div>
+</body>
+</html>

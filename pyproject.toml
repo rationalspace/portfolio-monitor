@@ -1,0 +1,45 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "portfolio-monitor"
+version = "0.1.0"
+description = "Tier-aware portfolio alert system for a Broker book."
+requires-python = ">=3.11"
+authors = [{ name = "rationalspace" }]
+dependencies = [
+    "pyyaml>=6.0",
+    "requests>=2.32",
+    "yfinance>=0.2.40",
+    "pandas>=2.2",
+    "numpy>=1.26",
+    "jinja2>=3.1",
+    "keyring>=25.0",
+    "pydantic>=2.7",
+    "snaptrade-python-sdk>=11.0",
+    "python-dateutil>=2.9",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.0",
+    "pytest-cov>=5.0",
+    "ruff>=0.5",
+]
+
+[project.scripts]
+portfolio-monitor = "portfolio_monitor.main:cli"
+portfolio-monitor-bootstrap = "portfolio_monitor.scripts.bootstrap_keychain:main"
+portfolio-monitor-run-once = "portfolio_monitor.scripts.run_once:main"
+
+[tool.hatch.build.targets.wheel]
+packages = ["portfolio_monitor"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "B", "UP"]
+ignore = ["E501"]
