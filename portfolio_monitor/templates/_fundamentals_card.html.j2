@@ -1,0 +1,86 @@
+{#
+  Reusable fundamentals card — included by alert.html.j2 and digest.html.j2.
+
+  Expected context:
+    fund  — FundamentalsSnapshot (or a dict with the same keys)
+    show_pe — bool (default True); hide in digest for space
+#}
+{% set show_pe = show_pe if show_pe is defined else true %}
+<table style="width: 100%; border-collapse: collapse; font-size: 13px; margin-top: 12px;">
+  <thead>
+    <tr>
+      <th colspan="2" style="text-align: left; font-size: 12px; color: #888; font-weight: 600;
+                              padding-bottom: 4px; border-bottom: 1px solid #eee;">
+        Fundamentals snapshot
+      </th>
+    </tr>
+  </thead>
+  <tbody>
+    {% if show_pe and fund.trailing_pe is not none %}
+    <tr>
+      <td style="padding: 4px 0; color: #888;">Trailing P/E</td>
+      <td style="padding: 4px 0; text-align: right;">{{ "{:.1f}".format(fund.trailing_pe) }}×</td>
+    </tr>
+    {% endif %}
+    {% if show_pe and fund.forward_pe is not none %}
+    <tr>
+      <td style="padding: 4px 0; color: #888;">Forward P/E</td>
+      <td style="padding: 4px 0; text-align: right;">{{ "{:.1f}".format(fund.forward_pe) }}×</td>
+    </tr>
+    {% endif %}
+
+    {% if fund.revenue_yoy is not none %}
+    <tr>
+      <td style="padding: 4px 0; color: #888;">Revenue YoY</td>
+      <td style="padding: 4px 0; text-align: right;
+                 color: {% if fund.revenue_yoy >= 0.10 %}#27ae60{% elif fund.revenue_yoy < 0 %}#c0392b{% else %}#888{% endif %};">
+        {{ "{:+.1%}".format(fund.revenue_yoy) }}
+      </td>
+    </tr>
+    {% endif %}
+
+    {% if fund.op_margin is not none %}
+    <tr>
+      <td style="padding: 4px 0; color: #888;">Op margin</td>
+      <td style="padding: 4px 0; text-align: right;">{{ "{:.1%}".format(fund.op_margin) }}</td>
+    </tr>
+    {% endif %}
+
+    {% if fund.op_margin_trend_4q is not none %}
+    <tr>
+      <td style="padding: 4px 0; color: #888;">Margin trend (4q)</td>
+      <td style="padding: 4px 0; text-align: right;
+                 color: {% if fund.op_margin_trend_4q < -0.02 %}#c0392b{% elif fund.op_margin_trend_4q > 0.02 %}#27ae60{% else %}#888{% endif %};">
+        {{ "{:+.1%}".format(fund.op_margin_trend_4q) }}
+      </td>
+    </tr>
+    {% endif %}
+
+    {% if fund.fcf_yoy is not none %}
+    <tr>
+      <td style="padding: 4px 0; color: #888;">FCF YoY</td>
+      <td style="padding: 4px 0; text-align: right;
+                 color: {% if fund.fcf_yoy >= 0 %}#27ae60{% else %}#c0392b{% endif %};">
+        {{ "{:+.1%}".format(fund.fcf_yoy) }}
+      </td>
+    </tr>
+    {% endif %}
+
+    {% if fund.eps_revisions_90d is not none %}
+    <tr>
+      <td style="padding: 4px 0; color: #888;">EPS revisions (90d)</td>
+      <td style="padding: 4px 0; text-align: right;
+                 color: {% if fund.eps_revisions_90d > 0 %}#27ae60{% elif fund.eps_revisions_90d < -0.05 %}#c0392b{% else %}#888{% endif %};">
+        {{ "{:+.1%}".format(fund.eps_revisions_90d) }}
+      </td>
+    </tr>
+    {% endif %}
+
+    {% if fund.analyst_target_mean is not none %}
+    <tr>
+      <td style="padding: 4px 0; color: #888;">Analyst target</td>
+      <td style="padding: 4px 0; text-align: right;">${{ "{:,.2f}".format(fund.analyst_target_mean) }}</td>
+    </tr>
+    {% endif %}
+  </tbody>
+</table>

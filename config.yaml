@@ -1,0 +1,108 @@
+# config.yaml — alert thresholds and runtime settings.
+# Edit freely. Per-ticker overrides live in tiers.yaml under `overrides:`.
+
+scheduler:
+  run_after_close_et: "16:30"
+  weekly_digest_day: "saturday"
+  weekly_digest_time_et: "08:00"
+
+alerts:
+  cooldown_days: 7              # Same ticker won't alert twice within this window per rule
+  email:
+    smtp_host: smtp.gmail.com
+    smtp_port: 587
+    from_address: ""            # Filled at runtime from Keychain
+    to_address: mandeepmakkar@gmail.com
+  pushover:                     # Optional, phase 4
+    enabled: false
+
+# Rule 0a — ATH Proximity (Tier 1 + Tier 2 — slow grind toward all-time high)
+# Fires when a long-held Tier 1/2 stock reaches X% of its ATH — the "DOCN scenario"
+# where a stock grinds up over months without a single big daily pop.
+ath_proximity:
+  enabled: true
+  ath_threshold_pct: 0.85       # Alert at 85%+ of ATH
+  long_term_only: true          # Only fire if there are LT (>1yr) profitable lots
+  apply_to_tiers:               # Which tiers to monitor
+    - tier_1
+    - tier_2
+  min_history_days: 365         # Need at least 1yr of data for ATH to be meaningful
+
+# Rule 0b — Exit Watchlist (Exit Pool — lower threshold, lot-level detail)
+# Fires when any exit-pool stock shows upward momentum. No volume gate.
+# Per-lot breakdown shows exactly which lots are long-term and profitable.
+exit_watchlist:
+  enabled: true
+  day_pop_pct: 0.03           # 3% single-day pop — lower bar since you want to exit
+  five_day_rally_pct: 0.08    # 8% cumulative over 5 trading days
+  consecutive_up_days: 3      # 3+ consecutive positive closes = upward trend
+
+# Rule 1 — Sell-into-strength (Exit Pool + Crypto Exposure)
+sell_into_strength:
+  enabled: true
+  single_day_pop_pct: 0.05      # 5% — owner-set, lowered from default 7%
+  volume_multiple_vs_30d: 1.5
+  five_day_rally_pct: 0.15
+  earnings_gap_up_pct: 0.05
+  catalyst_news_required: false # If true, only fire when a catalyst tag is present
+
+# Rule 2 — Capitulation warning (Exit Pool — informational only)
+capitulation:
+  enabled: true
+  unrealized_loss_pct: 0.35
+  digest_only: true             # Never urgent email
+
+# Rule 3 — Tier 3 weakness watch
+tier_3_weakness:
+  enabled: true
+  drawdown_floor_pct: 0.15      # Owner-confirmed
+  require_below_200dma: true
+  fundamental_signals_required: 1   # Any 1 of: rev_yoy<0, op_margin_decline_4q, eps_revisions_neg_90d, fcf_neg_yoy
+
+# Rule 4 — Tier 4 weakness watch (tighter — Tier 4 is expected to be volatile)
+tier_4_weakness:
+  enabled: true
+  drawdown_floor_pct: 0.25
+  require_below_200dma: true
+  fundamental_signals_required: 1
+
+# Rule 5 — Buy-the-dip new entry (watchlist names not yet held)
+buy_the_dip_new:
+  enabled: true
+  off_high_threshold: 0.85      # Trigger at <= 85% of 52-week high
+  rsi_14_max: 40
+  rev_yoy_min: 0.10
+  op_margin_min: 0.0
+  exclude_if_recent_guidance_cut: true
+
+# Rule 6 — Top-up compounder (watchlist names already in Tier 1 or 2)
+top_up_compounder:
+  enabled: true
+  off_high_threshold: 0.85
+  fundamentals_must_be_healthy: true
+
+# Rule 7 — Concentration drift (Tier 1 + Tier 2 only)
+concentration_drift:
+  enabled: true
+  position_pct_of_portfolio: 0.12
+  digest_only: true             # Never urgent email
+  honor_concentration_exempt: true
+
+# Rule 8 — Earnings heads-up
+earnings_heads_up:
+  enabled: true
+  trading_days_ahead: 3
+  digest_only: true
+
+# Data sources
+data_sources:
+  prices: yfinance              # Phase 1 free; phase 4 optional polygon
+  fundamentals: yfinance        # Phase 3 may add openbb for revisions
+  news: yfinance                # Phase 2 may add benzinga or alphavantage
+  ath_history_period: max
+  ath_refresh_days: 7
+
+# Logging
+logging:
+  level: INFO
+  retain_days: 90
