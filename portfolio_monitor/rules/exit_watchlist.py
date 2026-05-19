@@ -1,9 +1,14 @@
-"""Exit Watchlist Rule.
+"""Exit / Trim Watchlist Rule.
 
-Fires for Exit Pool tickers when the stock shows upward momentum — either a
-single-day pop >= 3%, a 5-day cumulative rally >= 8%, or 3+ consecutive
-positive closes. These are lower thresholds than sell_into_strength because the
-user has already decided to exit; we want to catch every decent window.
+Fires for:
+  - Exit Pool tickers: upward momentum signals to hunt a full-exit window.
+  - Trim Pool tickers: same momentum signals to flag a partial-trim opportunity
+    on a long-term hold (position stays, just trim the LTCG-eligible froth).
+
+Triggers (configurable):
+  - Single-day pop >= 3%
+  - 5-day cumulative rally >= 8%
+  - 3+ consecutive positive closes
 
 Alert includes full lot-by-lot breakdown, highlighting which lots are long-term
 (held > 1 year) and whether they're currently profitable — so the user can
@@ -65,19 +70,28 @@ class ExitWatchlistRule(Rule):
         cfg = self.config.exit_watchlist
         alerts: list[Alert] = []
 
-        exit_symbols = {
-            p.symbol for p in ctx.portfolio.positions
-            if ctx.tiers.tier_for(p.symbol) == Tier.EXIT_POOL
-        }
+        # Collect both exit-pool and trim-pool symbols, tagging each
+        candidates: list[tuple[str, Tier]] = []
+        for p in ctx.portfolio.positions:
+            t = ctx.tiers.tier_for(p.symbol)
+            if t in (Tier.EXIT_POOL, Tier.TRIM_POOL):
+                candidates.append((p.symbol, t))
+        # Deduplicate (multiple lots may produce duplicate symbols)
+        seen: set[str] = set()
+        unique: list[tuple[str, Tier]] = []
+        for sym, tier in candidates:
+            if sym not in seen:
+                seen.add(sym)
+                unique.append((sym, tier))
 
-        for symbol in sorted(exit_symbols):
+        for symbol, tier in sorted(unique):
             snap = ctx.market.snapshot(symbol)
             if snap is None:
                 continue
 
             triggers: list[str] = []
 
-            # Trigger A — single-day pop (no volume gate — any pop counts for exits)
+            # Trigger A — single-day pop
             if snap.day_return_pct >= cfg.day_pop_pct:
                 triggers.append(f"up {snap.day_return_pct:+.1%} today")
 
@@ -93,23 +107,31 @@ class ExitWatchlistRule(Rule):
             if not triggers:
                 continue
 
-            # Aggregate position metrics
+            # For trim pool: only alert when there are LTCG-profitable lots
             positions = ctx.portfolio.by_symbol(symbol)
+            lots = _lot_analysis(positions, snap.price)
+            lt_profitable = [l for l in lots if l["is_long_term"] and l["is_profitable"]]
+
+            if tier == Tier.TRIM_POOL and not lt_profitable:
+                log.debug("TRIM %s: momentum triggered but no LTCG-profitable lots — skipping", symbol)
+                continue
+
+            # Aggregate position metrics
             qty_total = sum(p.quantity for p in positions)
             mv_total = sum(p.market_value for p in positions)
             cost_total = sum(p.average_cost * p.quantity for p in positions)
             unrealized_pl = mv_total - cost_total
             unrealized_pl_pct = unrealized_pl / cost_total if cost_total else 0.0
-
-            # Lot breakdown
-            lots = _lot_analysis(positions, snap.price)
-            lt_profitable = [l for l in lots if l["is_long_term"] and l["is_profitable"]]
             lt_qty = sum(l["quantity"] for l in lt_profitable)
             lt_gain_total = sum(l["gain_total"] for l in lt_profitable)
 
+            is_trim = tier == Tier.TRIM_POOL
+            action_word = "trim" if is_trim else "exit"
+
             payload = {
                 "symbol": symbol,
-                "tier": ctx.tiers.tier_for(symbol).value,
+                "tier": tier.value,
+                "action": action_word,
                 "price": snap.price,
                 "day_return_pct": snap.day_return_pct,
                 "day_value_change": snap.day_return_pct * mv_total,
@@ -127,11 +149,11 @@ class ExitWatchlistRule(Rule):
                 "has_lt_profitable_lots": len(lt_profitable) > 0,
             }
 
-            # Build a crisp title and body
             lt_note = ""
             if lt_profitable:
                 lt_note = f" · {lt_qty:.0f} LT profitable shares (${lt_gain_total:+,.0f})"
-            title = f"{symbol} {snap.day_return_pct:+.1%} — exit window{lt_note}"
+
+            title = f"{symbol} {snap.day_return_pct:+.1%} — {action_word} window{lt_note}"
             body = "; ".join(triggers)
             if lt_profitable:
                 body += f". {len(lt_profitable)} long-term profitable lot(s) — consider selling LTCG-eligible shares first."
@@ -146,8 +168,8 @@ class ExitWatchlistRule(Rule):
             ))
 
             log.info(
-                "EXIT ALERT %s: %s | LT profitable: %d lot(s), %g shares",
-                symbol, "; ".join(triggers), len(lt_profitable), lt_qty,
+                "%s ALERT %s: %s | LT profitable: %d lot(s), %g shares",
+                action_word.upper(), symbol, "; ".join(triggers), len(lt_profitable), lt_qty,
             )
 
         return alerts

@@ -23,6 +23,7 @@ class Tier(str, Enum):
     TIER_3 = "tier_3"
     TIER_4 = "tier_4"
     EXIT_POOL = "exit_pool"
+    TRIM_POOL = "trim_pool"   # partial-trim on momentum — same signals as exit_pool but position stays
     CRYPTO_EXPOSURE = "crypto_exposure"
     INDEX_FUND = "index_fund"
     UNCATEGORIZED = "uncategorized"  # held but not in any list — flagged in digest
@@ -53,6 +54,7 @@ class TierMap(BaseModel):
     tier_3: list[str] = Field(default_factory=list)
     tier_4: list[str] = Field(default_factory=list)
     exit_pool: list[str] = Field(default_factory=list)
+    trim_pool: list[str] = Field(default_factory=list)
     crypto_exposure: list[str] = Field(default_factory=list)
     watchlist: list[WatchlistEntry] = Field(default_factory=list)
     index_fund: list[str] = Field(default_factory=list)
@@ -71,6 +73,8 @@ class TierMap(BaseModel):
             return Tier.TIER_4
         if s in {x.upper() for x in self.exit_pool}:
             return Tier.EXIT_POOL
+        if s in {x.upper() for x in self.trim_pool}:
+            return Tier.TRIM_POOL
         if s in {x.upper() for x in self.crypto_exposure}:
             return Tier.CRYPTO_EXPOSURE
         if s in {x.upper() for x in self.index_fund}:
@@ -96,6 +100,7 @@ class TierMap(BaseModel):
             self.tier_3,
             self.tier_4,
             self.exit_pool,
+            self.trim_pool,
             self.crypto_exposure,
             self.index_fund,
         ):
