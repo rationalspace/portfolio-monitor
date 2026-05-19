@@ -100,7 +100,18 @@ Two YAML files drive everything — no code changes ever needed:
 - **`tiers.yaml`** — tier assignments, watchlist, exit pool, per-ticker overrides
 - **`config.yaml`** — rule thresholds, on/off switches, scheduler timing
 
-## Broker CSV → Ghostfolio import
+## Ghostfolio (optional dashboard)
+
+A `docker-compose.yml` is included to run [Ghostfolio](https://ghostfolio.dev) locally — portfolio dashboard, lot store, charts.
+
+```bash
+cp .env.example .env          # fill in secrets (openssl rand -hex 32 for each)
+docker compose up -d          # starts Ghostfolio + Postgres + Redis at localhost:3333
+```
+
+`.env` is git-ignored. Never commit it. `.env.example` is the template.
+
+### Broker CSV → Ghostfolio import
 
 ```bash
 python -m portfolio_monitor.scripts.broker_to_ghostfolio \
@@ -109,7 +120,7 @@ python -m portfolio_monitor.scripts.broker_to_ghostfolio \
   --account-map "YOUR_ACCOUNT_2=ghostfolio-account-id-2"
 ```
 
-Dividends and unmapped accounts are automatically excluded.
+Dividends and unmapped accounts are automatically excluded. The output CSV is a generated file — not committed to git.
 
 ## Project layout
 
