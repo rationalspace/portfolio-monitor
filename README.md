@@ -1,6 +1,6 @@
 # Portfolio Monitor (US — Fidelity)
 
-Tier-aware portfolio alert system for a Fidelity book, running locally on macOS.
+Tier-aware portfolio alert system for a Fidelity brokerage account, running locally on macOS.
 Designed to *protect compounders, trim near all-time highs, prune laggards on rallies, and dip-buy quality* — not to chase momentum.
 
 ## Architecture
@@ -37,18 +37,18 @@ All sell-side alerts include:
 
 ## Tier system
 
-All assignments live in `tiers.yaml` — no code changes needed to move a stock.
+All assignments live in `tiers.yaml` (git-ignored — copy from `tiers.example.yaml`). No code changes needed to move a stock between tiers.
 
-| Tier | Description | Example holdings |
+| Tier | Description | Protection level |
 |---|---|---|
-| `tier_1` | Blue-chip compounders — protect | MSFT, NVDA, GOOGL, AAPL, AMZN |
-| `tier_2` | High-octane growth — protect with light watch | META, PLTR, ANET, ORCL, NFLX |
-| `tier_3` | Specialized / rebound — active watch | QCOM, NET, OKTA |
-| `tier_4` | Speculative — tighter watch | SOFI |
-| `exit_pool` | Decided to exit — hunt every rally | SMCI, S, RBRK, PYPL, PATH, OXY, ADBE, TWLO, DOCN |
-| `crypto_exposure` | Crypto ETFs | COIN, FBTC |
-| `watchlist` | Buy candidates not yet fully held | MU, TSM, KLAC, ARM, CRWV |
-| `index_fund` | Excluded from single-name rules | QQQ, FXAIX, FBGRX |
+| `tier_1` | Blue-chip compounders — long-term core positions | Highest — no sell alerts, concentration watch only |
+| `tier_2` | High-octane growth — strong conviction holds | High — alerts only on fundamental breakdown |
+| `tier_3` | Specialized / rebound plays — active monitoring | Medium — weakness watch with drawdown + DMA gates |
+| `tier_4` | Speculative growth — tighter leash | Tighter — lower drawdown threshold before alert fires |
+| `exit_pool` | Positions decided to exit — hunt every rally | None — alerts on any meaningful pop or consecutive up days |
+| `crypto_exposure` | Crypto-linked ETFs | Sell-into-strength only; fundamentals rules disabled |
+| `watchlist` | Buy candidates — not yet fully positioned | Buy-the-dip alerts when quality names pull back |
+| `index_fund` | Broad index funds | Excluded from all single-name rules |
 
 ## Scheduling & catch-up
 
@@ -76,16 +76,51 @@ python -c "import keyring; keyring.set_password('portfolio-monitor', 'gmail_addr
 python -c "import keyring; keyring.set_password('portfolio-monitor', 'gmail_app_password', 'xxxx-xxxx-xxxx-xxxx')"
 ```
 
+### Schedule (macOS launchd)
+
+Create a plist in `~/Library/LaunchAgents/com.portfoliomonitor.daily.plist`:
+
+```xml
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN"
+  "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>Label</key><string>com.portfoliomonitor.daily</string>
+  <key>ProgramArguments</key>
+  <array>
+    <string>/Users/YOUR_USERNAME/portfolio-monitor/.venv/bin/python</string>
+    <string>-m</string>
+    <string>portfolio_monitor.scripts.run_guarded</string>
+  </array>
+  <key>WorkingDirectory</key><string>/Users/YOUR_USERNAME/portfolio-monitor</string>
+  <key>StartCalendarInterval</key>
+  <array>
+    <!-- fires every 30 min, 4:30–8:00 PM ET (Mon–Fri) -->
+    <dict><key>Hour</key><integer>16</integer><key>Minute</key><integer>30</integer></dict>
+    <dict><key>Hour</key><integer>17</integer><key>Minute</key><integer>0</integer></dict>
+    <dict><key>Hour</key><integer>17</integer><key>Minute</key><integer>30</integer></dict>
+    <dict><key>Hour</key><integer>18</integer><key>Minute</key><integer>0</integer></dict>
+    <dict><key>Hour</key><integer>18</integer><key>Minute</key><integer>30</integer></dict>
+    <dict><key>Hour</key><integer>19</integer><key>Minute</key><integer>0</integer></dict>
+    <dict><key>Hour</key><integer>19</integer><key>Minute</key><integer>30</integer></dict>
+    <dict><key>Hour</key><integer>20</integer><key>Minute</key><integer>0</integer></dict>
+  </array>
+  <key>StandardOutPath</key><string>/Users/YOUR_USERNAME/Library/Logs/portfolio-monitor.log</string>
+  <key>StandardErrorPath</key><string>/Users/YOUR_USERNAME/Library/Logs/portfolio-monitor.log</string>
+</dict>
+</plist>
+```
+
+Then load it:
+```bash
+launchctl load ~/Library/LaunchAgents/com.portfoliomonitor.daily.plist
+launchctl list com.portfoliomonitor.daily   # verify loaded
+```
+
 ### Dry run
 ```bash
 python -m portfolio_monitor.scripts.run_guarded --dry-run
-```
-
-### Install launchd job
-```bash
-cp launchd/com.portfoliomonitor.daily.plist ~/Library/LaunchAgents/
-launchctl load ~/Library/LaunchAgents/com.portfoliomonitor.daily.plist
-launchctl list com.portfoliomonitor.daily   # verify loaded
 ```
 
 ### Logs
@@ -101,7 +136,7 @@ Two YAML files drive everything — no code changes ever needed:
 - **`config.yaml`** — rule thresholds, on/off switches, scheduler timing
 
 ```bash
-cp tiers.example.yaml tiers.yaml   # then edit with your own tickers
+cp tiers.example.yaml tiers.yaml   # then populate with your own tickers
 ```
 
 A `realized_pnl.yaml` ledger tracks closed positions (also git-ignored). Copy from `realized_pnl.example.yaml` to start your own.
@@ -122,20 +157,22 @@ docker compose up -d          # starts Ghostfolio + Postgres + Redis at localhos
 ```bash
 python -m portfolio_monitor.scripts.fidelity_to_ghostfolio \
   input.csv output.csv \
-  --account-map "<YOUR_ACCOUNT_ID>=ghostfolio-account-id-1" \
+  --account-map "<YOUR_ACCOUNT_1>=ghostfolio-account-id-1" \
   --account-map "<YOUR_ACCOUNT_2>=ghostfolio-account-id-2"
 ```
 
-Dividends and unmapped accounts are automatically excluded. The output CSV is a generated file — not committed to git.
+Dividends and unmapped accounts are automatically excluded.
 
 ## Project layout
 
 ```
-portfolio_monitor/
-├── tiers.yaml                  # Tier assignments (edit freely)
+portfolio-monitor/
+├── tiers.yaml                  # Your tier assignments (git-ignored — copy from tiers.example.yaml)
+├── tiers.example.yaml          # Template — populate with your own tickers
+├── realized_pnl.yaml           # Closed position ledger (git-ignored — copy from realized_pnl.example.yaml)
 ├── config.yaml                 # Thresholds + runtime config (edit freely)
-├── launchd/
-│   └── com.portfoliomonitor.daily.plist
+├── docker-compose.yml          # Optional Ghostfolio stack
+├── .env.example                # Ghostfolio secrets template
 ├── portfolio_monitor/
 │   ├── main.py                 # Daily orchestration
 │   ├── tiers_loader.py         # YAML → typed config + AppConfig
@@ -159,12 +196,12 @@ portfolio_monitor/
 │   └── scripts/
 │       ├── run_guarded.py      # Time-gate + sentinel → main.run_once()
 │       └── fidelity_to_ghostfolio.py
-└── tests/                      # 77 tests, no network required
+└── tests/                      # Tests, no network required
 ```
 
 ## Tests
 ```bash
-pytest tests/   # 77 tests, all offline
+pytest tests/   # all offline
 ```
 
 ---
