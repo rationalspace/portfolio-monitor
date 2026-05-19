@@ -1,0 +1,35 @@
+# realized_pnl.example.yaml — Template for realized_pnl.yaml
+# Copy to realized_pnl.yaml and record your own closed positions.
+# realized_pnl.yaml is git-ignored (contains your private trade history).
+#
+# Fields:
+#   date:            Trade date (YYYY-MM-DD), use ~ if unknown
+#   symbol:          Ticker
+#   description:     Security description
+#   shares_sold:     Number of shares sold
+#   price_per_share: Sell price ($)
+#   cost_basis:      Total cost of shares sold ($)
+#   proceeds:        Net proceeds from sale ($)
+#   gain_loss:       Net realized gain/loss ($)
+#   term:            "long" (LTCG, held >1yr) | "short" (STCG, held ≤1yr) | "mixed"
+#   notes:           Optional context (lot details, split adjustments, etc.)
+
+realized_trades:
+
+  - date: "2025-06-15"
+    symbol: EXAMPLE
+    description: "Example Corp"
+    shares_sold: 100
+    price_per_share: 150.00
+    cost_basis: 10000.00
+    proceeds: 15000.00
+    gain_loss: +5000.00
+    term: long
+    notes: "Full position exit. +50% LTCG."
+
+# ── Summary ──────────────────────────────────────────────────────────────────
+#
+# EXAMPLE:  +$5,000  (LTCG)
+# ─────────────────────────
+# Total LTCG:  +$5,000
+# Total STCG:  $0

@@ -97,8 +97,14 @@ launchctl list com.portfoliomonitor.daily   # verify loaded
 
 Two YAML files drive everything — no code changes ever needed:
 
-- **`tiers.yaml`** — tier assignments, watchlist, exit pool, per-ticker overrides
+- **`tiers.yaml`** — tier assignments, watchlist, exit pool, per-ticker overrides *(git-ignored — copy from `tiers.example.yaml`)*
 - **`config.yaml`** — rule thresholds, on/off switches, scheduler timing
+
+```bash
+cp tiers.example.yaml tiers.yaml   # then edit with your own tickers
+```
+
+A `realized_pnl.yaml` ledger tracks closed positions (also git-ignored). Copy from `realized_pnl.example.yaml` to start your own.
 
 ## Ghostfolio (optional dashboard)
 
@@ -116,8 +122,8 @@ docker compose up -d          # starts Ghostfolio + Postgres + Redis at localhos
 ```bash
 python -m portfolio_monitor.scripts.fidelity_to_ghostfolio \
   input.csv output.csv \
-  --account-map "YOUR_ACCOUNT_1=ghostfolio-account-id-1" \
-  --account-map "YOUR_ACCOUNT_2=ghostfolio-account-id-2"
+  --account-map "<YOUR_ACCOUNT_ID>=ghostfolio-account-id-1" \
+  --account-map "<YOUR_ACCOUNT_2>=ghostfolio-account-id-2"
 ```
 
 Dividends and unmapped accounts are automatically excluded. The output CSV is a generated file — not committed to git.

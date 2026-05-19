@@ -19,8 +19,8 @@ Usage::
     python -m portfolio_monitor.scripts.fidelity_to_ghostfolio \\
         ~/Downloads/Accounts_History.csv \\
         --output ghostfolio_import.csv \\
-        --account-map "YOUR_ACCOUNT_1=<ghostfolio-acct-uuid>" \\
-        --account-map "YOUR_ACCOUNT_2=<ghostfolio-acct-uuid>"
+        --account-map "<YOUR_ACCOUNT_1>=<ghostfolio-acct-uuid>" \\
+        --account-map "<YOUR_ACCOUNT_2>=<ghostfolio-acct-uuid>"
 
 Then upload ghostfolio_import.csv via the Ghostfolio UI:
     Activities → "Import Activities" button → drag the CSV.

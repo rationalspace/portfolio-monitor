@@ -1,0 +1,42 @@
+# tiers.example.yaml — Template for tiers.yaml
+# Copy to tiers.yaml and fill in your own tickers.
+# tiers.yaml is git-ignored (contains your private portfolio).
+# No code changes needed when moving stocks between tiers.
+
+tier_1:  # Blue-Chip Powerhouses — protect, no sell alerts, concentration only
+  - MSFT
+  - AAPL
+  - GOOGL
+
+tier_2:  # High-Octane Growth — protect with light watch, fundamentals-break only
+  - META
+  - NFLX
+
+tier_3:  # Specialized / Rebound — active weakness watch
+  - QCOM
+
+tier_4:  # Speculative Growth — tighter weakness watch
+  - EXAMPLE_SPEC
+
+exit_pool:  # Sell-into-strength + capitulation watch
+  - EXAMPLE_EXIT   # reason you want to exit
+
+crypto_exposure:  # Sell-into-strength only; fundamentals rules disabled
+  - COIN
+
+watchlist:  # Buy-the-dip on quality — when fundamentals stay healthy
+  - symbol: TSM
+    tier_when_acquired: tier_1
+  - symbol: MU
+    tier_when_acquired: tier_2
+
+index_fund:  # Excluded from single-name rules; counted in total-portfolio math
+  - QQQ
+  - FXAIX
+
+# Per-ticker overrides — anything here overrides default rule behaviour
+overrides:
+  GOOGL:
+    concentration_exempt: true   # example: owner has chosen to keep the overweight
+  # AAPL:
+  #   alert_cooldown_days: 14
