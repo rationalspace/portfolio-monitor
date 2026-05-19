@@ -1,12 +1,14 @@
-# Portfolio Monitor (Fidelity)
+# Portfolio Monitor
 
-Tier-aware portfolio alert system for a Fidelity brokerage account, running locally on macOS.
+Tier-aware alert system for a brokerage account, running locally on macOS.
 Designed to *protect compounders, trim near all-time highs, prune laggards on rallies, and dip-buy quality* — not to chase momentum.
+
+Connects to your brokerage via [SnapTrade](https://snaptrade.com) (supports 50+ brokers including Fidelity, Schwab, TD Ameritrade, and others).
 
 ## Architecture
 
 ```
-SnapTrade (Fidelity OAuth) ──► positions + lot-level data
+SnapTrade (brokerage OAuth) ──► positions + lot-level data
                                     │
                                     ▼
    yfinance (prices, ATH, ─────► Alert engine (Python)  ──► Gmail SMTP
@@ -37,7 +39,7 @@ All sell-side alerts include:
 
 ## Tier system
 
-All assignments live in `tiers.yaml` (git-ignored — copy from `tiers.example.yaml`). No code changes needed to move a stock between tiers.
+All assignments live in `tiers.yaml` (kept local — copy from `tiers.example.yaml`). No code changes needed to move a stock between tiers.
 
 | Tier | Description | Protection level |
 |---|---|---|
@@ -59,14 +61,28 @@ All assignments live in `tiers.yaml` (git-ignored — copy from `tiers.example.y
 
 ## Setup
 
-### Install
+### 1. Install
 ```bash
 cd ~/portfolio-monitor
 python3 -m venv .venv && source .venv/bin/activate
 pip install -e .
 ```
 
-### Secrets (macOS Keychain)
+### 2. SnapTrade (brokerage connection)
+
+SnapTrade is the OAuth bridge that connects this tool to your brokerage account. It's free for personal use.
+
+1. Sign up at [snaptrade.com](https://snaptrade.com) and create an application to get a **Client ID** and **Consumer Key**
+2. Run the one-time registration to get your **User ID** and **User Secret**:
+   ```bash
+   python -m portfolio_monitor.scripts.snaptrade_register
+   ```
+   This opens a browser to connect your brokerage account via OAuth.
+3. Store the four credentials in macOS Keychain (see step 3 below)
+
+SnapTrade supports 50+ brokers — connect whichever account holds your positions.
+
+### 3. Secrets (macOS Keychain)
 ```bash
 python -c "import keyring; keyring.set_password('portfolio-monitor', 'SNAPTRADE_CLIENT_ID', 'YOUR_ID')"
 python -c "import keyring; keyring.set_password('portfolio-monitor', 'SNAPTRADE_CLIENT_SECRET', 'YOUR_SECRET')"
@@ -76,9 +92,14 @@ python -c "import keyring; keyring.set_password('portfolio-monitor', 'gmail_addr
 python -c "import keyring; keyring.set_password('portfolio-monitor', 'gmail_app_password', 'xxxx-xxxx-xxxx-xxxx')"
 ```
 
-### Schedule (macOS launchd)
+### 4. Configure tiers
+```bash
+cp tiers.example.yaml tiers.yaml   # then populate with your own tickers
+```
 
-Create a plist in `~/Library/LaunchAgents/com.portfoliomonitor.daily.plist`:
+### 5. Schedule (macOS launchd)
+
+Create `~/Library/LaunchAgents/com.portfoliomonitor.daily.plist`:
 
 ```xml
 <?xml version="1.0" encoding="UTF-8"?>
@@ -132,14 +153,10 @@ python -m portfolio_monitor.scripts.run_guarded --dry-run
 
 Two YAML files drive everything — no code changes ever needed:
 
-- **`tiers.yaml`** — tier assignments, watchlist, exit pool, per-ticker overrides *(git-ignored — copy from `tiers.example.yaml`)*
+- **`tiers.yaml`** — tier assignments, watchlist, exit pool, per-ticker overrides *(kept local — copy from `tiers.example.yaml`)*
 - **`config.yaml`** — rule thresholds, on/off switches, scheduler timing
 
-```bash
-cp tiers.example.yaml tiers.yaml   # then populate with your own tickers
-```
-
-A `realized_pnl.yaml` ledger tracks closed positions (also git-ignored). Copy from `realized_pnl.example.yaml` to start your own.
+A `realized_pnl.yaml` ledger tracks closed positions (also kept local). Copy from `realized_pnl.example.yaml` to start your own.
 
 ## Ghostfolio (optional dashboard)
 
@@ -150,9 +167,9 @@ cp .env.example .env          # fill in secrets (openssl rand -hex 32 for each)
 docker compose up -d          # starts Ghostfolio + Postgres + Redis at localhost:3333
 ```
 
-`.env` is git-ignored. Never commit it. `.env.example` is the template.
+`.env` is kept local. Never commit it. `.env.example` is the template.
 
-### Fidelity CSV → Ghostfolio import
+### Brokerage CSV → Ghostfolio import
 
 ```bash
 python -m portfolio_monitor.scripts.fidelity_to_ghostfolio \
@@ -167,9 +184,9 @@ Dividends and unmapped accounts are automatically excluded.
 
 ```
 portfolio-monitor/
-├── tiers.yaml                  # Your tier assignments (git-ignored — copy from tiers.example.yaml)
+├── tiers.yaml                  # Your tier assignments (local — copy from tiers.example.yaml)
 ├── tiers.example.yaml          # Template — populate with your own tickers
-├── realized_pnl.yaml           # Closed position ledger (git-ignored — copy from realized_pnl.example.yaml)
+├── realized_pnl.yaml           # Closed position ledger (local — copy from realized_pnl.example.yaml)
 ├── config.yaml                 # Thresholds + runtime config (edit freely)
 ├── docker-compose.yml          # Optional Ghostfolio stack
 ├── .env.example                # Ghostfolio secrets template
@@ -177,7 +194,7 @@ portfolio-monitor/
 │   ├── main.py                 # Daily orchestration
 │   ├── tiers_loader.py         # YAML → typed config + AppConfig
 │   ├── portfolio_types.py      # Position, Lot, Portfolio dataclasses
-│   ├── snaptrade_client.py     # Live Fidelity holdings via SnapTrade
+│   ├── snaptrade_client.py     # Live holdings via SnapTrade
 │   ├── market_data.py          # yfinance: prices, ATH, fundamentals, news
 │   ├── store.py                # SQLite cooldown log
 │   ├── email_dispatch.py       # Jinja2 HTML → Gmail SMTP
