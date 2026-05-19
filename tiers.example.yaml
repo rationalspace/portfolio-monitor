@@ -1,42 +1,39 @@
 # tiers.example.yaml — Template for tiers.yaml
-# Copy to tiers.yaml and fill in your own tickers.
-# tiers.yaml is git-ignored (contains your private portfolio).
-# No code changes needed when moving stocks between tiers.
+# Copy to tiers.yaml and populate with your own tickers.
+# tiers.yaml is kept local (not committed).
 
-tier_1:  # Blue-Chip Powerhouses — protect, no sell alerts, concentration only
-  - MSFT
-  - AAPL
-  - GOOGL
+tier_1:  # Blue-chip compounders — protect, no sell alerts, concentration watch only
+  - TICKER1
+  - TICKER2
 
-tier_2:  # High-Octane Growth — protect with light watch, fundamentals-break only
-  - META
-  - NFLX
+tier_2:  # High-octane growth — protect with light watch, fundamentals-break only
+  - TICKER3
+  - TICKER4
 
-tier_3:  # Specialized / Rebound — active weakness watch
-  - QCOM
+tier_3:  # Specialized / rebound — active weakness watch
+  - TICKER5
 
-tier_4:  # Speculative Growth — tighter weakness watch
-  - EXAMPLE_SPEC
+tier_4:  # Speculative growth — tighter weakness watch
+  - TICKER6
 
-exit_pool:  # Sell-into-strength + capitulation watch
-  - EXAMPLE_EXIT   # reason you want to exit
+exit_pool:  # Sell-into-strength + exit hunting on any rally
+  - TICKER7
 
 crypto_exposure:  # Sell-into-strength only; fundamentals rules disabled
-  - COIN
+  - TICKER8
 
-watchlist:  # Buy-the-dip on quality — when fundamentals stay healthy
-  - symbol: TSM
+watchlist:  # Buy-the-dip candidates — alerts when quality names pull back
+  - symbol: TICKER9
     tier_when_acquired: tier_1
-  - symbol: MU
+  - symbol: TICKER10
     tier_when_acquired: tier_2
 
-index_fund:  # Excluded from single-name rules; counted in total-portfolio math
-  - QQQ
-  - FXAIX
+index_fund:  # Excluded from all single-name rules; counted in total-portfolio math
+  - TICKER11
 
-# Per-ticker overrides — anything here overrides default rule behaviour
-overrides:
-  GOOGL:
-    concentration_exempt: true   # example: owner has chosen to keep the overweight
-  # AAPL:
+# Per-ticker overrides — override default rule behaviour for specific symbols
+overrides: {}
+  # TICKER1:
+  #   concentration_exempt: true
+  # TICKER2:
   #   alert_cooldown_days: 14

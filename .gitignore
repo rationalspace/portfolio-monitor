@@ -14,11 +14,3 @@ dist/
 .coverage
 .DS_Store
 ghostfolio_import.csv
-.env
-
-# Personal portfolio data — keep private, use *.example.yaml as templates
-tiers.yaml
-realized_pnl.yaml
-
-# macOS scheduler config — path-specific, keep local
-launchd/
