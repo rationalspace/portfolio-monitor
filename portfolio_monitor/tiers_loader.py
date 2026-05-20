@@ -144,6 +144,7 @@ class ExitWatchlistConfig(BaseModel):
     day_pop_pct: float = 0.03          # Fire on any 3%+ single-day move
     five_day_rally_pct: float = 0.08   # Or 5-day cumulative return >= 8%
     consecutive_up_days: int = 3        # Or N consecutive positive closes
+    cooldown_days: int = 1              # Re-alert daily while rally continues (vs 7-day global)
 
 
 class CapitulationConfig(BaseModel):
