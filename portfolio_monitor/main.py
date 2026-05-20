@@ -77,10 +77,12 @@ def run_once(*, dry_run: bool = False, send_digest: bool = False) -> int:
             continue
 
         for alert in alerts:
-            cooldown_days = (
-                tiers.override_for(alert.symbol).alert_cooldown_days
-                or config.alerts.cooldown_days
-            )
+            # Cooldown priority: per-ticker override → rule-specific → global default.
+            # exit_watchlist uses a 1-day cooldown so rallies keep alerting daily.
+            per_ticker = tiers.override_for(alert.symbol).alert_cooldown_days
+            rule_specific = getattr(config, alert.rule, None)
+            rule_specific_days = getattr(rule_specific, "cooldown_days", None) if rule_specific else None
+            cooldown_days = per_ticker or rule_specific_days or config.alerts.cooldown_days
             if store.in_cooldown(alert.symbol, alert.rule, cooldown_days):
                 log.debug("Cooldown skip: %s/%s", alert.symbol, alert.rule)
                 continue
