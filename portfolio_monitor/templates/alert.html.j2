@@ -46,7 +46,7 @@
       <tr>
         <td style="padding: 6px 0; color: #888;">Unrealized P&amp;L</td>
         <td style="padding: 6px 0; text-align: right; color: {% if p.unrealized_pl_pct < 0 %}#c0392b{% else %}#27ae60{% endif %}; font-weight: 600;">
-          {{ "{:+.0%}".format(p.unrealized_pl_pct) }} ({{ "{:+,.0f}".format(p.unrealized_pl) }})
+          {{ "{:+.0%}".format(p.unrealized_pl_pct) }} ({{ "+" if p.unrealized_pl >= 0 else "-" }}${{ "{:,.0f}".format(p.unrealized_pl | abs) }})
         </td>
       </tr>
       {% endif %}
