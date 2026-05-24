@@ -12,6 +12,7 @@ SnapTrade brokerage connection is read-only anyway), additional methods can be a
 from __future__ import annotations
 
 import logging
+import socket
 from collections import defaultdict
 from datetime import date
 from typing import Any
@@ -55,6 +56,12 @@ class SnapTradeClient:
         )
         self._user_id = get_secret(SecretKey.SNAPTRADE_USER_ID)
         self._user_secret = get_secret(SecretKey.SNAPTRADE_USER_SECRET)
+
+        # Apply a 90-second socket timeout globally for this process.
+        # The SnapTrade SDK's public API methods don't expose a per-call timeout,
+        # but urllib3 respects socket.getdefaulttimeout() — this prevents the
+        # process from hanging forever if SnapTrade's server stops responding.
+        socket.setdefaulttimeout(90.0)
 
     # ------------------------------------------------------------------ public
 
@@ -117,15 +124,10 @@ class SnapTradeClient:
 
     # --------------------------------------------------------------- internals
 
-    # 30 s connect + 60 s read — enough for SnapTrade's normal response time
-    # without hanging the entire run if their server stops responding.
-    _SNAPTRADE_TIMEOUT: tuple[float, float] = (30.0, 60.0)
-
     def _list_accounts(self) -> list[dict[str, Any]]:
         resp = self._client.account_information.list_user_accounts(
             user_id=self._user_id,
             user_secret=self._user_secret,
-            timeout=self._SNAPTRADE_TIMEOUT,
         )
         return list(resp.body or [])
 
@@ -134,7 +136,6 @@ class SnapTradeClient:
             user_id=self._user_id,
             user_secret=self._user_secret,
             account_id=account_id,
-            timeout=self._SNAPTRADE_TIMEOUT,
         )
         return dict(resp.body or {})
 
@@ -153,7 +154,6 @@ class SnapTradeClient:
                 user_id=self._user_id,
                 user_secret=self._user_secret,
                 accounts=account_id,
-                timeout=self._SNAPTRADE_TIMEOUT,
             )
             return list(resp.body or [])
         except Exception as exc:  # noqa: BLE001
