@@ -117,15 +117,24 @@ class SnapTradeClient:
 
     # --------------------------------------------------------------- internals
 
+    # 30 s connect + 60 s read — enough for SnapTrade's normal response time
+    # without hanging the entire run if their server stops responding.
+    _SNAPTRADE_TIMEOUT: tuple[float, float] = (30.0, 60.0)
+
     def _list_accounts(self) -> list[dict[str, Any]]:
         resp = self._client.account_information.list_user_accounts(
-            user_id=self._user_id, user_secret=self._user_secret
+            user_id=self._user_id,
+            user_secret=self._user_secret,
+            timeout=self._SNAPTRADE_TIMEOUT,
         )
         return list(resp.body or [])
 
     def _account_holdings(self, account_id: str) -> dict[str, Any]:
         resp = self._client.account_information.get_user_holdings(
-            user_id=self._user_id, user_secret=self._user_secret, account_id=account_id
+            user_id=self._user_id,
+            user_secret=self._user_secret,
+            account_id=account_id,
+            timeout=self._SNAPTRADE_TIMEOUT,
         )
         return dict(resp.body or {})
 
@@ -144,6 +153,7 @@ class SnapTradeClient:
                 user_id=self._user_id,
                 user_secret=self._user_secret,
                 accounts=account_id,
+                timeout=self._SNAPTRADE_TIMEOUT,
             )
             return list(resp.body or [])
         except Exception as exc:  # noqa: BLE001
