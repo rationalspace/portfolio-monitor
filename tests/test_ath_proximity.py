@@ -60,7 +60,8 @@ def _position(lots, price=147.0, symbol="DOCN"):
 
 def _fake_hist(days=2000):
     idx = pd.date_range(end=pd.Timestamp.today(), periods=days, freq="B", tz="UTC")
-    return pd.DataFrame({"Close": [100.0] * days, "Volume": [1e6] * days}, index=idx)
+    n = len(idx)  # may be < days when today is a weekend/holiday
+    return pd.DataFrame({"Close": [100.0] * n, "Volume": [1e6] * n}, index=idx)
 
 
 def _ctx(snap, positions, ath=163.0, hist_days=2000, tier=Tier.TIER_2):

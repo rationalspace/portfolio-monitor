@@ -15,10 +15,15 @@ Sentinel location: ~/.portfolio-monitor-last-run  (contains YYYY-MM-DD)
 from __future__ import annotations
 
 import logging
+import signal
 import sys
 from datetime import date, datetime, timezone
 from pathlib import Path
 from zoneinfo import ZoneInfo
+
+# Kill the process if the entire run takes longer than this.
+# Normal runs complete in ~30 s; 10 minutes is a generous ceiling.
+_RUN_TIMEOUT_SECONDS = 600
 
 log = logging.getLogger(__name__)
 
@@ -69,14 +74,28 @@ def main() -> int:
 
     log.info("Conditions met — starting portfolio monitor run.")
 
+    # Hard timeout: if the run hangs (e.g. a SnapTrade or yfinance request that
+    # never returns), SIGALRM fires after _RUN_TIMEOUT_SECONDS and raises
+    # TimeoutError so the process exits cleanly instead of hanging forever.
+    def _timeout_handler(signum: int, frame: object) -> None:  # noqa: ARG001
+        raise TimeoutError(f"Run exceeded {_RUN_TIMEOUT_SECONDS}s hard limit — aborting.")
+
+    signal.signal(signal.SIGALRM, _timeout_handler)
+    signal.alarm(_RUN_TIMEOUT_SECONDS)
+
     # Import here so startup is fast for the common skip paths above.
     from portfolio_monitor.main import run_once
 
     try:
         run_once()
+        signal.alarm(0)  # cancel the alarm on success
         mark_ran_today()
         log.info("Run completed and sentinel written.")
+    except TimeoutError as exc:
+        log.error("TIMEOUT: %s — sentinel NOT written (will retry next slot).", exc)
+        return 1
     except Exception:
+        signal.alarm(0)
         log.exception("Portfolio monitor run failed — sentinel NOT written (will retry next slot).")
         return 1
 
