@@ -41,13 +41,13 @@ def test_yaml_loads_cleanly():
 def test_tier_lookups_for_known_owner_picks():
     tiers = load_tiers(REPO / "tiers.yaml")
     assert tiers.tier_for("GOOGL") == Tier.TIER_1
-    assert tiers.tier_for("AMD") == Tier.TIER_1     # promoted from Tier 3
     assert tiers.tier_for("NFLX") == Tier.TIER_2    # promoted from Tier 3
     assert tiers.tier_for("DOCN") == Tier.EXIT_POOL  # moved to exit pool — selling position
     assert tiers.tier_for("PYPL") == Tier.EXIT_POOL
     assert tiers.tier_for("V") == Tier.EXIT_POOL
     assert tiers.tier_for("NOW") == Tier.EXIT_POOL
     assert tiers.tier_for("ADBE") == Tier.EXIT_POOL
+    assert tiers.tier_for("S") == Tier.TRIM_POOL     # short-term lots; hold until LTCG then exit
     assert tiers.tier_for("COIN") == Tier.CRYPTO_EXPOSURE
     assert tiers.tier_for("FBTC") == Tier.CRYPTO_EXPOSURE
     assert tiers.tier_for("UNKNOWN_TICKER") == Tier.UNCATEGORIZED
