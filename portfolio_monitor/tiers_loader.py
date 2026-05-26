@@ -116,6 +116,13 @@ class EmailConfig(BaseModel):
     to_address: str
 
 
+class TaxRatesConfig(BaseModel):
+    """Your marginal capital-gains tax rates — used to estimate after-tax gain on each lot.
+    Update these in config.yaml to match your actual bracket."""
+    lt_rate: float = 0.15    # Long-term capital gains rate (federal; add state if applicable)
+    st_rate: float = 0.32    # Short-term rate (ordinary income); adjust to your marginal bracket
+
+
 class AlertsConfig(BaseModel):
     cooldown_days: int = 7
     email: EmailConfig
@@ -212,6 +219,7 @@ class AppConfig(BaseModel):
 
     scheduler: SchedulerConfig = Field(default_factory=SchedulerConfig)
     alerts: AlertsConfig
+    tax_rates: TaxRatesConfig = Field(default_factory=TaxRatesConfig)
     sell_into_strength: SellIntoStrengthConfig = Field(default_factory=SellIntoStrengthConfig)
     ath_proximity: AthProximityConfig = Field(default_factory=AthProximityConfig)
     exit_watchlist: ExitWatchlistConfig = Field(default_factory=ExitWatchlistConfig)
