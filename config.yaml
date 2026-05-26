@@ -6,6 +6,15 @@ scheduler:
   weekly_digest_day: "saturday"
   weekly_digest_time_et: "08:00"
 
+# Your marginal capital-gains tax rates — shown in every exit/trim alert so you can
+# see the estimated after-tax gain before deciding to sell.
+# lt_rate: federal long-term CGT (0%, 15%, or 20% depending on income)
+# st_rate: federal short-term rate (= ordinary income marginal bracket)
+# Add state tax to each if you want all-in figures.
+tax_rates:
+  lt_rate: 0.15    # 15% LTCG — update if you're in the 20% bracket
+  st_rate: 0.32    # 32% ordinary income — update to your actual marginal rate
+
 alerts:
   cooldown_days: 7              # Same ticker won't alert twice within this window per rule
   email:
