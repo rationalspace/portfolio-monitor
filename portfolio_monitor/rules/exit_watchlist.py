@@ -127,8 +127,8 @@ class ExitWatchlistRule(Rule):
 
             title = f"{symbol} {snap.day_return_pct:+.1%} — {action_word} window{lt_note}"
             body = "; ".join(triggers)
-            if lt_profitable:
-                body += f". {len(lt_profitable)} long-term profitable lot(s) — consider selling LTCG-eligible shares first."
+            if tax["has_lt_profitable_lots"]:
+                body += f". {tax['lt_profitable_qty']:.0f} LT profitable shares — consider selling LTCG-eligible shares first."
 
             alerts.append(Alert(
                 symbol=symbol,
@@ -140,8 +140,9 @@ class ExitWatchlistRule(Rule):
             ))
 
             log.info(
-                "%s ALERT %s: %s | LT profitable: %d lot(s), %g shares",
-                action_word.upper(), symbol, "; ".join(triggers), len(lt_profitable), lt_qty,
+                "%s ALERT %s: %s | LT profitable: %s, %g shares",
+                action_word.upper(), symbol, "; ".join(triggers),
+                "yes" if tax["has_lt_profitable_lots"] else "no", lt_qty,
             )
 
         return alerts
