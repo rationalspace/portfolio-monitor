@@ -16,6 +16,7 @@ from __future__ import annotations
 from ..catalysts import classify
 from ..tiers_loader import Tier
 from .base import Alert, EvaluationContext, Rule, Severity
+from .lot_utils import lot_analysis as _lot_analysis, lot_tax_summary as _lot_tax_summary
 
 
 class SellIntoStrengthRule(Rule):
@@ -76,14 +77,20 @@ class SellIntoStrengthRule(Rule):
             if not triggers:
                 continue
 
-            # Build the alert payload. Cost basis comes from the position aggregate
-            # so the email can show what an exit would crystallize today.
+            # Build the alert payload — includes full lot breakdown with LT/ST
+            # flags, tax estimates, and eligibility dates so every sell alert
+            # shows the same tax picture regardless of which rule fired.
             positions = ctx.portfolio.by_symbol(symbol)
             qty_total = sum(p.quantity for p in positions)
             mv_total = sum(p.market_value for p in positions)
             cost_total = sum(p.average_cost * p.quantity for p in positions)
             unrealized_pl = mv_total - cost_total
             unrealized_pl_pct = (unrealized_pl / cost_total) if cost_total else 0.0
+
+            lt_rate = self.config.tax_rates.lt_rate
+            st_rate = self.config.tax_rates.st_rate
+            lots = _lot_analysis(positions, snap.price, lt_rate, st_rate)
+            tax = _lot_tax_summary(lots, lt_rate, st_rate)
 
             payload = {
                 "symbol": symbol,
@@ -101,6 +108,8 @@ class SellIntoStrengthRule(Rule):
                 "cost_basis": cost_total,
                 "unrealized_pl": unrealized_pl,
                 "unrealized_pl_pct": unrealized_pl_pct,
+                "lots": lots,
+                **tax,
             }
             title = f"{symbol} {snap.day_return_pct:+.1%} — possible exit window"
             body = "; ".join(triggers)
