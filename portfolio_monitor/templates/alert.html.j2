@@ -79,17 +79,77 @@
     </ul>
     {% endif %}
 
-    {# Buy-the-dip stats #}
+    {# Buy-the-dip / top-up stats #}
     {% if p.off_high_pct is defined %}
     <h3 style="font-size: 14px; color: #2c3e50; margin: 16px 0 6px;">Dip metrics</h3>
-    <table style="width: 100%; border-collapse: collapse; font-size: 14px;">
-      <tr><td style="color:#888;">Price</td><td style="text-align:right;">${{ "{:,.2f}".format(p.price) }}</td></tr>
-      <tr><td style="color:#888;">52w high</td><td style="text-align:right;">${{ "{:,.2f}".format(p.fifty_two_week_high) }}</td></tr>
-      <tr><td style="color:#888;">Off high</td><td style="text-align:right; color:#c0392b;">{{ "{:.0%}".format(p.off_high_pct) }}</td></tr>
+    <table style="width: 100%; border-collapse: collapse; font-size: 14px; margin-bottom: 12px;">
+      <tr style="background:#fafafa;">
+        <td style="padding:6px 4px; color:#888; border-bottom:1px solid #eee;">Entry price</td>
+        <td style="padding:6px 4px; text-align:right; font-weight:700; font-size:16px; border-bottom:1px solid #eee;">${{ "{:,.2f}".format(p.price) }}</td>
+      </tr>
+      <tr>
+        <td style="padding:6px 4px; color:#888; border-bottom:1px solid #eee;">52w high</td>
+        <td style="padding:6px 4px; text-align:right; border-bottom:1px solid #eee;">${{ "{:,.2f}".format(p.fifty_two_week_high) }}</td>
+      </tr>
+      <tr style="background:#fafafa;">
+        <td style="padding:6px 4px; color:#888; border-bottom:1px solid #eee;">Off high</td>
+        <td style="padding:6px 4px; text-align:right; font-weight:600; color:#c0392b; border-bottom:1px solid #eee;">{{ "{:.0%}".format(p.off_high_pct) }}</td>
+      </tr>
+      {% if p.analyst_target is defined and p.analyst_target %}
+      <tr>
+        <td style="padding:6px 4px; color:#888; border-bottom:1px solid #eee;">Analyst target</td>
+        <td style="padding:6px 4px; text-align:right; border-bottom:1px solid #eee; color:#27ae60; font-weight:600;">
+          ${{ "{:,.2f}".format(p.analyst_target) }}
+          <span style="color:#888; font-weight:normal; margin-left:4px;">({{ "{:+.0%}".format((p.analyst_target - p.price) / p.price) }} upside)</span>
+        </td>
+      </tr>
+      {% endif %}
+      {% if p.trailing_pe is defined and p.trailing_pe %}
+      <tr style="background:#fafafa;">
+        <td style="padding:6px 4px; color:#888; border-bottom:1px solid #eee;">Trailing P/E</td>
+        <td style="padding:6px 4px; text-align:right; border-bottom:1px solid #eee;">{{ "{:.0f}".format(p.trailing_pe) }}x</td>
+      </tr>
+      {% endif %}
+      {% if p.forward_pe is defined and p.forward_pe %}
+      <tr>
+        <td style="padding:6px 4px; color:#888; border-bottom:1px solid #eee;">Forward P/E</td>
+        <td style="padding:6px 4px; text-align:right; font-weight:600; border-bottom:1px solid #eee;">{{ "{:.0f}".format(p.forward_pe) }}x</td>
+      </tr>
+      {% endif %}
+      {% if p.revenue_yoy is defined and p.revenue_yoy is not none %}
+      <tr style="background:#fafafa;">
+        <td style="padding:6px 4px; color:#888; border-bottom:1px solid #eee;">Revenue YoY</td>
+        <td style="padding:6px 4px; text-align:right; font-weight:600; border-bottom:1px solid #eee;
+             color:{% if p.revenue_yoy >= 0 %}#27ae60{% else %}#c0392b{% endif %};">{{ "{:+.0%}".format(p.revenue_yoy) }}</td>
+      </tr>
+      {% endif %}
+      {% if p.op_margin is defined and p.op_margin is not none %}
+      <tr>
+        <td style="padding:6px 4px; color:#888; border-bottom:1px solid #eee;">Op margin</td>
+        <td style="padding:6px 4px; text-align:right; border-bottom:1px solid #eee;">{{ "{:.0%}".format(p.op_margin) }}</td>
+      </tr>
+      {% endif %}
       {% if p.rsi_14 is defined %}
-      <tr><td style="color:#888;">RSI(14)</td><td style="text-align:right;">{{ "{:.0f}".format(p.rsi_14) }}</td></tr>
+      <tr style="background:#fafafa;">
+        <td style="padding:6px 4px; color:#888;">RSI(14)</td>
+        <td style="padding:6px 4px; text-align:right;">{{ "{:.0f}".format(p.rsi_14) }}</td>
+      </tr>
       {% endif %}
     </table>
+
+    {% if p.news_headlines is defined and p.news_headlines %}
+    <h3 style="font-size: 14px; color: #2c3e50; margin: 16px 0 6px;">Why is it down? — recent headlines</h3>
+    <ul style="margin: 0 0 12px; padding-left: 18px; color: #555; font-size: 13px; line-height: 1.6;">
+      {% for h in p.news_headlines %}
+      {% if h.title %}
+      <li><a href="{{ h.url or '#' }}" style="color: #2980b9; text-decoration:none;">{{ h.title }}</a>
+        {% if h.publisher %}<span style="color:#aaa; font-size:11px;"> — {{ h.publisher }}</span>{% endif %}
+      </li>
+      {% endif %}
+      {% endfor %}
+    </ul>
+    {% endif %}
+
     {% endif %}
 
     {# ATH proximity stats — ath_proximity rule #}

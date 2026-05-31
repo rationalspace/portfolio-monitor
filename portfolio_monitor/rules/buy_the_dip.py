@@ -64,6 +64,7 @@ class BuyTheDipRule(Rule):
                 if has_recent_guidance_cut(news):
                     continue
 
+            news = ctx.market.recent_news(symbol, limit=5)
             payload = {
                 "symbol": symbol,
                 "tier_when_acquired": entry.tier_when_acquired.value,
@@ -71,15 +72,23 @@ class BuyTheDipRule(Rule):
                 "fifty_two_week_high": high,
                 "off_high_pct": (snap.price - high) / high,
                 "rsi_14": rsi,
+                "trailing_pe": fund.trailing_pe,
+                "forward_pe": fund.forward_pe,
+                "analyst_target": fund.analyst_target_mean,
+                "revenue_yoy": fund.revenue_yoy,
+                "op_margin": fund.op_margin,
+                "news_headlines": news[:5],
                 "fundamentals": fund.__dict__ | {"raw": None},
             }
+            off_pct = (snap.price / high - 1)
+            pe_str = f"fwd PE {fund.forward_pe:.0f}x" if fund.forward_pe else ""
             alerts.append(
                 Alert(
                     symbol=symbol,
                     rule=self.name,
                     severity=Severity.HIGH,
-                    title=f"{symbol} {(snap.price/high - 1):+.0%} off 52w high — buy candidate",
-                    body=f"RSI {rsi:.0f}, fundamentals healthy",
+                    title=f"{symbol} {off_pct:+.0%} off 52w high — buy candidate",
+                    body=f"RSI {rsi:.0f} · {pe_str} · fundamentals healthy",
                     payload=payload,
                 )
             )
@@ -128,12 +137,21 @@ class TopUpCompounderRule(Rule):
                 if fund.op_margin_trend_4q is not None and fund.op_margin_trend_4q < -0.05:
                     continue
 
+            news = ctx.market.recent_news(symbol, limit=5)
+            off_pct = (snap.price / high - 1)
+            pe_str = f"fwd PE {fund.forward_pe:.0f}x" if fund.forward_pe else ""
             payload = {
                 "symbol": symbol,
                 "tier": tier.value,
                 "price": snap.price,
                 "fifty_two_week_high": high,
-                "off_high_pct": (snap.price - high) / high,
+                "off_high_pct": off_pct,
+                "trailing_pe": fund.trailing_pe,
+                "forward_pe": fund.forward_pe,
+                "analyst_target": fund.analyst_target_mean,
+                "revenue_yoy": fund.revenue_yoy,
+                "op_margin": fund.op_margin,
+                "news_headlines": news[:5],
                 "fundamentals": fund.__dict__ | {"raw": None},
             }
             alerts.append(
@@ -141,8 +159,8 @@ class TopUpCompounderRule(Rule):
                     symbol=symbol,
                     rule=self.name,
                     severity=Severity.MEDIUM,
-                    title=f"Top-up opportunity — {symbol} {(snap.price/high - 1):+.0%} off high",
-                    body="Already-owned compounder on sale",
+                    title=f"Top-up opportunity — {symbol} {off_pct:+.0%} off high",
+                    body=f"Already-owned compounder on sale · {pe_str}",
                     payload=payload,
                 )
             )
