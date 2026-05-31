@@ -125,7 +125,9 @@ class TopUpCompounderRule(Rule):
             if not high or not snap:
                 continue
             ratio = snap.price / high if high else 1.0
-            if ratio > cfg.off_high_threshold:
+            # Use a tighter threshold for Tier 1 blue chips (10% off vs 15% for Tier 2)
+            threshold = cfg.tier_1_off_high_threshold if tier == Tier.TIER_1 else cfg.off_high_threshold
+            if ratio > threshold:
                 continue
 
             fund = ctx.market.fundamentals(symbol)
