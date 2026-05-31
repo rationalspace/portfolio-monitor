@@ -21,7 +21,6 @@ import logging
 import sys
 from datetime import date
 
-from .compliance_checker import get_compliance_status
 from .email_dispatch import EmailDispatcher
 from .market_data import MarketData
 from .rules import ALL_RULES, Alert, EvaluationContext, Severity
@@ -63,7 +62,6 @@ def run_once(*, dry_run: bool = False, send_digest: bool = False) -> int:
         market=market,
     )
 
-    compliance = get_compliance_status(root / "coe_trade_log.yaml")
     digest_pile: list[Alert] = []
     sent_count = 0
 
@@ -88,9 +86,6 @@ def run_once(*, dry_run: bool = False, send_digest: bool = False) -> int:
             if store.in_cooldown(alert.symbol, alert.rule, cooldown_days):
                 log.debug("Cooldown skip: %s/%s", alert.symbol, alert.rule)
                 continue
-
-            # Attach compliance status to every alert payload before dispatch.
-            alert.payload["compliance"] = compliance
 
             store.record(
                 symbol=alert.symbol,
