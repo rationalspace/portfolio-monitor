@@ -28,6 +28,12 @@ from .snaptrade_client import SnapTradeClient
 from .store import Store
 from .tiers_loader import AppConfig, TierMap, load_config, load_tiers, project_root
 
+try:
+    from .compliance_checker import get_compliance_status  # local-only, not in public repo
+    _COMPLIANCE_AVAILABLE = True
+except ImportError:
+    _COMPLIANCE_AVAILABLE = False
+
 log = logging.getLogger(__name__)
 
 
@@ -62,6 +68,8 @@ def run_once(*, dry_run: bool = False, send_digest: bool = False) -> int:
         market=market,
     )
 
+    compliance = get_compliance_status() if _COMPLIANCE_AVAILABLE else None
+
     digest_pile: list[Alert] = []
     sent_count = 0
 
@@ -86,6 +94,16 @@ def run_once(*, dry_run: bool = False, send_digest: bool = False) -> int:
             if store.in_cooldown(alert.symbol, alert.rule, cooldown_days):
                 log.debug("Cooldown skip: %s/%s", alert.symbol, alert.rule)
                 continue
+
+            if compliance is not None:
+                alert.payload["compliance"] = {
+                    "quarter": compliance.quarter,
+                    "used": compliance.used,
+                    "limit": compliance.limit,
+                    "remaining": compliance.remaining,
+                    "warning": compliance.warning,
+                    "critical": compliance.critical,
+                }
 
             store.record(
                 symbol=alert.symbol,
