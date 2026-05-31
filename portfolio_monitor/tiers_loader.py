@@ -178,7 +178,8 @@ class BuyTheDipConfig(BaseModel):
 
 class TopUpConfig(BaseModel):
     enabled: bool = True
-    off_high_threshold: float = 0.85
+    off_high_threshold: float = 0.85           # Tier 2 threshold (15% off high)
+    tier_1_off_high_threshold: float = 0.90    # Tier 1 threshold (10% off high — blue chips rarely dip 15%)
     fundamentals_must_be_healthy: bool = True
 
 

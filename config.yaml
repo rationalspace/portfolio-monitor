@@ -87,7 +87,8 @@ buy_the_dip_new:
 # Rule 6 — Top-up compounder (watchlist names already in Tier 1 or 2)
 top_up_compounder:
   enabled: true
-  off_high_threshold: 0.85
+  off_high_threshold: 0.85           # Tier 2 — fire when 15%+ off 52w high
+  tier_1_off_high_threshold: 0.90    # Tier 1 — fire when 10%+ off 52w high (blue chips rarely dip 15%)
   fundamentals_must_be_healthy: true
 
 # Rule 7 — Concentration drift (Tier 1 + Tier 2 only)
