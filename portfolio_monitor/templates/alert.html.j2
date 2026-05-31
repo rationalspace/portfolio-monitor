@@ -241,6 +241,18 @@
     </ul>
     {% endif %}
 
+    {# COE Compliance block #}
+    {% if p.compliance is defined %}
+    {% set c = p.compliance %}
+    <div style="margin-top: 20px; padding: 12px 16px; border-radius: 6px; font-size: 13px;
+         background: {% if c.status == 'ok' %}#f0fdf4{% elif c.status == 'caution' %}#fffbeb{% elif c.status == 'warning' %}#fff7ed{% else %}#fef2f2{% endif %};
+         border-left: 4px solid {% if c.status == 'ok' %}#22c55e{% elif c.status == 'caution' %}#eab308{% elif c.status == 'warning' %}#f97316{% else %}#ef4444{% endif %};">
+      <strong style="color: #374151;">COE Compliance — {{ c.quarter }}</strong><br>
+      <span style="color: #555;">{{ c.status_note }}</span><br>
+      <span style="color: #888; font-size: 12px;">If you act on this alert → trade {{ c.if_executed }} of {{ c.trades_limit }} this quarter.</span>
+    </div>
+    {% endif %}
+
     <div style="margin-top: 24px; padding-top: 16px; border-top: 1px solid #eee; font-size: 12px; color: #999;">
       Portfolio Monitor · {{ alert.fired_at.strftime('%Y-%m-%d %H:%M UTC') }} · Tier: {{ p.tier or 'n/a' }}
       <br>This is an alert, not advice. Review tier assignments quarterly.
