@@ -79,6 +79,116 @@
     </ul>
     {% endif %}
 
+    {# ── Technical pulse block — top_up_compounder (Phase 2) ── #}
+    {% if p.technical_tier is defined %}
+    {% set tier_colors = {
+      'SCREAMING_BUY': '#c0392b',
+      'STRONG_DIP':    '#e67e22',
+      'HEALTHY_DIP':   '#27ae60',
+      'TREND_CAUTION': '#7f8c8d'
+    } %}
+    {% set tier_labels = {
+      'SCREAMING_BUY': 'Strong Entry',
+      'STRONG_DIP':    'Good Entry',
+      'HEALTHY_DIP':   'Normal Dip',
+      'TREND_CAUTION': 'Trend Caution'
+    } %}
+    <div style="background: #f8f9fa; border-radius: 6px; padding: 14px 16px; margin: 0 0 16px; border-left: 4px solid {{ tier_colors.get(p.technical_tier, '#888') }};">
+      <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 8px; flex-wrap: wrap;">
+        <span style="background: {{ tier_colors.get(p.technical_tier, '#888') }}; color: #fff; padding: 3px 10px; border-radius: 4px; font-size: 12px; font-weight: 700; letter-spacing: .3px;">
+          {{ tier_labels.get(p.technical_tier, p.technical_tier) }}
+        </span>
+        <span style="font-size: 13px; color: #555; font-weight: 600;">What the chart is telling you</span>
+      </div>
+      <p style="margin: 0 0 12px; font-size: 13px; color: #444; line-height: 1.5;">{{ p.technical_summary }}</p>
+
+      {# Visual: where is the price in the 20-day range? #}
+      {% if p.bb_pct_b is defined and p.bb_pct_b is not none %}
+      {% if p.bb_pct_b < 0 %}{% set bb_pos = 0 %}
+      {% elif p.bb_pct_b > 1 %}{% set bb_pos = 100 %}
+      {% else %}{% set bb_pos = (p.bb_pct_b * 100) | int %}{% endif %}
+      <div style="margin-bottom: 10px;">
+        <div style="font-size: 11px; color: #999; margin-bottom: 3px;">20-day price range position (0 = floor, 100 = ceiling)</div>
+        <div style="position: relative; height: 8px; border-radius: 4px; background: linear-gradient(to right, #27ae60 0%, #f39c12 50%, #c0392b 100%);">
+          <div style="position: absolute; top: -4px; width: 16px; height: 16px; background: #2c3e50; border-radius: 50%; border: 2px solid #fff; left: {{ bb_pos }}%; transform: translateX(-50%);"></div>
+        </div>
+        <div style="display: flex; justify-content: space-between; font-size: 10px; color: #aaa; margin-top: 4px;">
+          <span>Floor{% if p.bb_lower %} ${{ "{:,.0f}".format(p.bb_lower) }}{% endif %}</span>
+          <span>Mid</span>
+          <span>Ceiling{% if p.bb_upper %} ${{ "{:,.0f}".format(p.bb_upper) }}{% endif %}</span>
+        </div>
+      </div>
+      {% endif %}
+
+      {# MA50/MA200 status pills #}
+      <div style="display: flex; gap: 8px; flex-wrap: wrap;">
+        {% if p.above_ma200 is not none %}
+        <span style="font-size: 11px; padding: 2px 8px; border-radius: 3px; font-weight: 600;
+          background: {% if p.above_ma200 %}#e8f5e9{% else %}#fdecea{% endif %};
+          color: {% if p.above_ma200 %}#2e7d32{% else %}#922b21{% endif %};">
+          Long-term trend: {% if p.above_ma200 %}intact ✓{% else %}broken ✗{% endif %}{% if p.ma200 %} (${{ "{:,.0f}".format(p.ma200) }}){% endif %}
+        </span>
+        {% endif %}
+        {% if p.above_ma50 is not none %}
+        <span style="font-size: 11px; padding: 2px 8px; border-radius: 3px; font-weight: 600;
+          background: {% if p.above_ma50 %}#e8f5e9{% else %}#fff8e1{% endif %};
+          color: {% if p.above_ma50 %}#2e7d32{% else %}#7d4e00{% endif %};">
+          Short-term: {% if p.above_ma50 %}recovering{% else %}negative (normal during dip){% endif %}{% if p.ma50 %} (${{ "{:,.0f}".format(p.ma50) }}){% endif %}
+        </span>
+        {% endif %}
+        {% if p.rsi_14 is defined and p.rsi_14 is not none %}
+        <span style="font-size: 11px; padding: 2px 8px; border-radius: 3px; font-weight: 600;
+          background: {% if p.rsi_14 < 35 %}#fdecea{% elif p.rsi_14 < 50 %}#fff8e1{% else %}#f5f5f5{% endif %};
+          color: {% if p.rsi_14 < 35 %}#922b21{% elif p.rsi_14 < 50 %}#7d4e00{% else %}#555{% endif %};">
+          Selling gauge: {{ "{:.0f}".format(p.rsi_14) }}/100{% if p.rsi_14 < 35 %} (selling exhausted){% elif p.rsi_14 < 50 %} (selling negative){% else %} (neutral){% endif %}
+        </span>
+        {% endif %}
+      </div>
+    </div>
+    {% endif %}
+
+    {# ── MA Crossover block (Phase 4) ── #}
+    {% if p.crossover_type is defined %}
+    {% set is_golden = p.crossover_type == 'GOLDEN' %}
+    <div style="background: {% if is_golden %}#e8f5e9{% else %}#fdecea{% endif %}; border-radius: 6px; padding: 14px 16px; margin: 0 0 16px;
+         border-left: 4px solid {% if is_golden %}#27ae60{% else %}#c0392b{% endif %};">
+      <div style="font-size: 13px; font-weight: 700; margin-bottom: 8px;
+           color: {% if is_golden %}#1b5e20{% else %}#7f0000{% endif %};">
+        {% if is_golden %}✅ Recovery confirmed{% else %}⚠️ Selling pressure building{% endif %}
+      </div>
+      <p style="margin: 0 0 12px; font-size: 13px; color: #444; line-height: 1.5;">{{ p.crossover_summary }}</p>
+      <table style="font-size: 13px; border-collapse: collapse;">
+        {% if p.price %}
+        <tr>
+          <td style="padding: 3px 12px 3px 0; color: #888;">Current price</td>
+          <td style="padding: 3px 0; font-weight: 700;">${{ "{:,.2f}".format(p.price) }}</td>
+        </tr>
+        {% endif %}
+        {% if p.ma50 %}
+        <tr>
+          <td style="padding: 3px 12px 3px 0; color: #888;">50-day average</td>
+          <td style="padding: 3px 0; font-weight: 600;">${{ "{:,.0f}".format(p.ma50) }}</td>
+        </tr>
+        {% endif %}
+        {% if p.ma200 %}
+        <tr>
+          <td style="padding: 3px 12px 3px 0; color: #888;">200-day average</td>
+          <td style="padding: 3px 0; font-weight: 600;">${{ "{:,.0f}".format(p.ma200) }}</td>
+        </tr>
+        {% endif %}
+        {% if p.gap_pct is not none %}
+        <tr>
+          <td style="padding: 3px 12px 3px 0; color: #888;">Gap (50d vs 200d)</td>
+          <td style="padding: 3px 0; font-weight: 600;
+               color: {% if p.gap_pct >= 0 %}#27ae60{% else %}#c0392b{% endif %};">
+            {{ "{:+.1%}".format(p.gap_pct) }}
+          </td>
+        </tr>
+        {% endif %}
+      </table>
+    </div>
+    {% endif %}
+
     {# Buy-the-dip / top-up stats #}
     {% if p.off_high_pct is defined %}
     <h3 style="font-size: 14px; color: #2c3e50; margin: 16px 0 6px;">Dip metrics</h3>
@@ -177,6 +287,126 @@
         <td style="padding: 6px 0; text-align: right; color: #888;">${{ "{:,.2f}".format(p.gap_to_ath) }} per share</td>
       </tr>
     </table>
+    {% endif %}
+
+    {# Stock snapshot — exit_watchlist / sell_into_strength rules #}
+    {% if p.lots is defined and (p.trailing_pe is defined or p.forward_pe is defined or p.rsi_14 is defined) %}
+    <h3 style="font-size: 14px; color: #2c3e50; margin: 20px 0 6px;">Stock snapshot</h3>
+    <table style="width: 100%; border-collapse: collapse; font-size: 14px; margin-bottom: 12px;">
+      <tr style="background:#fafafa;">
+        <td style="padding:6px 4px; color:#888; border-bottom:1px solid #eee;">Price</td>
+        <td style="padding:6px 4px; text-align:right; font-weight:700; border-bottom:1px solid #eee;">${{ "{:,.2f}".format(p.price) }}</td>
+      </tr>
+      {% if p.fifty_two_week_high is defined and p.fifty_two_week_high %}
+      <tr>
+        <td style="padding:6px 4px; color:#888; border-bottom:1px solid #eee;">52w high</td>
+        <td style="padding:6px 4px; text-align:right; border-bottom:1px solid #eee;">
+          ${{ "{:,.2f}".format(p.fifty_two_week_high) }}
+          <span style="color:#888; font-size:12px; margin-left:4px;">({{ "{:+.0%}".format((p.price / p.fifty_two_week_high) - 1) }} from high)</span>
+        </td>
+      </tr>
+      {% endif %}
+      {% if p.rsi_14 is defined and p.rsi_14 is not none %}
+      <tr style="background:#fafafa;">
+        <td style="padding:6px 4px; color:#888; border-bottom:1px solid #eee;">RSI(14)</td>
+        <td style="padding:6px 4px; text-align:right; font-weight:600; border-bottom:1px solid #eee;
+            color:{% if p.rsi_14 >= 70 %}#c0392b{% elif p.rsi_14 <= 35 %}#27ae60{% else %}#333{% endif %};">
+          {{ "{:.0f}".format(p.rsi_14) }}
+          {% if p.rsi_14 >= 70 %} 🔴 overbought{% elif p.rsi_14 <= 35 %} 🟢 oversold{% endif %}
+        </td>
+      </tr>
+      {% endif %}
+      {% if p.trailing_pe is defined and p.trailing_pe %}
+      <tr>
+        <td style="padding:6px 4px; color:#888; border-bottom:1px solid #eee;">Trailing P/E</td>
+        <td style="padding:6px 4px; text-align:right; border-bottom:1px solid #eee;">{{ "{:.0f}".format(p.trailing_pe) }}x</td>
+      </tr>
+      {% endif %}
+      {% if p.forward_pe is defined and p.forward_pe %}
+      <tr style="background:#fafafa;">
+        <td style="padding:6px 4px; color:#888; border-bottom:1px solid #eee;">Forward P/E</td>
+        <td style="padding:6px 4px; text-align:right; font-weight:600; border-bottom:1px solid #eee;">{{ "{:.0f}".format(p.forward_pe) }}x</td>
+      </tr>
+      {% endif %}
+      {% if p.revenue_yoy is defined and p.revenue_yoy is not none %}
+      <tr>
+        <td style="padding:6px 4px; color:#888; border-bottom:1px solid #eee;">Revenue YoY</td>
+        <td style="padding:6px 4px; text-align:right; font-weight:600; border-bottom:1px solid #eee;
+            color:{% if p.revenue_yoy >= 0 %}#27ae60{% else %}#c0392b{% endif %};">{{ "{:+.0%}".format(p.revenue_yoy) }}</td>
+      </tr>
+      {% endif %}
+      {% if p.op_margin is defined and p.op_margin is not none %}
+      <tr style="background:#fafafa;">
+        <td style="padding:6px 4px; color:#888; border-bottom:1px solid #eee;">Op margin</td>
+        <td style="padding:6px 4px; text-align:right; border-bottom:1px solid #eee;">{{ "{:.0%}".format(p.op_margin) }}</td>
+      </tr>
+      {% endif %}
+      {% if p.analyst_target is defined and p.analyst_target %}
+      <tr>
+        <td style="padding:6px 4px; color:#888; border-bottom:1px solid #eee;">Analyst target</td>
+        <td style="padding:6px 4px; text-align:right; border-bottom:1px solid #eee;">
+          <span style="font-weight:600;">${{ "{:,.2f}".format(p.analyst_target) }}</span>
+          <span style="color:#888; font-size:12px; margin-left:4px;">({{ "{:+.0%}".format((p.analyst_target - p.price) / p.price) }})</span>
+          {% if p.analyst_target_low is defined and p.analyst_target_high is defined and p.analyst_target_low and p.analyst_target_high %}
+          <span style="color:#aaa; font-size:11px; display:block;">range ${{ "{:,.0f}".format(p.analyst_target_low) }}–${{ "{:,.0f}".format(p.analyst_target_high) }}</span>
+          {% endif %}
+        </td>
+      </tr>
+      {% endif %}
+      {% if p.analyst_recommendation is defined and p.analyst_recommendation %}
+      <tr style="background:#fafafa;">
+        <td style="padding:6px 4px; color:#888; border-bottom:1px solid #eee;">Consensus</td>
+        <td style="padding:6px 4px; text-align:right; font-weight:600; border-bottom:1px solid #eee;
+            color:{% if 'buy' in p.analyst_recommendation %}#27ae60{% elif 'sell' in p.analyst_recommendation %}#c0392b{% else %}#888{% endif %};">
+          {{ p.analyst_recommendation.replace('_', ' ').title() }}
+          {% if p.analyst_count is defined and p.analyst_count %}<span style="color:#aaa; font-weight:normal; font-size:11px;"> ({{ p.analyst_count }} analysts)</span>{% endif %}
+        </td>
+      </tr>
+      {% endif %}
+    </table>
+
+    {# EPS beat/miss history #}
+    {% if p.eps_history is defined and p.eps_history %}
+    <h3 style="font-size: 14px; color: #2c3e50; margin: 16px 0 6px;">EPS history — last 4 quarters</h3>
+    <table style="width:100%; border-collapse:collapse; font-size:13px; margin-bottom:12px;">
+      <tr style="background:#f0f0f0; font-size:11px; color:#666;">
+        <th style="padding:4px 6px; text-align:left; font-weight:600;">Quarter</th>
+        <th style="padding:4px 6px; text-align:right; font-weight:600;">Est.</th>
+        <th style="padding:4px 6px; text-align:right; font-weight:600;">Actual</th>
+        <th style="padding:4px 6px; text-align:right; font-weight:600;">Surprise</th>
+      </tr>
+      {% for q in p.eps_history %}
+      <tr style="{% if loop.index is odd %}background:#fafafa;{% endif %}">
+        <td style="padding:4px 6px; color:#555; border-bottom:1px solid #eee;">{{ q.period }}</td>
+        <td style="padding:4px 6px; text-align:right; color:#888; border-bottom:1px solid #eee;">
+          {% if q.estimate is not none %}${{ "{:.2f}".format(q.estimate) }}{% else %}—{% endif %}
+        </td>
+        <td style="padding:4px 6px; text-align:right; font-weight:600; border-bottom:1px solid #eee;
+            color:{% if q.actual is not none and q.estimate is not none and q.actual >= q.estimate %}#27ae60{% else %}#c0392b{% endif %};">
+          {% if q.actual is not none %}${{ "{:.2f}".format(q.actual) }}{% else %}—{% endif %}
+        </td>
+        <td style="padding:4px 6px; text-align:right; font-weight:600; border-bottom:1px solid #eee;
+            color:{% if q.surprise_pct is not none and q.surprise_pct >= 0 %}#27ae60{% else %}#c0392b{% endif %};">
+          {% if q.surprise_pct is not none %}{{ "{:+.0f}".format(q.surprise_pct) }}%{% else %}—{% endif %}
+        </td>
+      </tr>
+      {% endfor %}
+    </table>
+    {% endif %}
+
+    {# Recent news headlines #}
+    {% if p.news_headlines is defined and p.news_headlines %}
+    <h3 style="font-size: 14px; color: #2c3e50; margin: 16px 0 6px;">Recent headlines</h3>
+    <ul style="margin: 0 0 12px; padding-left: 18px; color: #555; font-size: 13px; line-height: 1.6;">
+      {% for h in p.news_headlines %}
+      {% if h.title %}
+      <li><a href="{{ h.url or '#' }}" style="color: #2980b9; text-decoration:none;">{{ h.title }}</a>
+        {% if h.publisher %}<span style="color:#aaa; font-size:11px;"> — {{ h.publisher }}</span>{% endif %}
+      </li>
+      {% endif %}
+      {% endfor %}
+    </ul>
+    {% endif %}
     {% endif %}
 
     {# Lot breakdown — exit_watchlist rule #}

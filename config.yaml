@@ -90,6 +90,18 @@ top_up_compounder:
   off_high_threshold: 0.85           # Tier 2 — fire when 15%+ off 52w high
   tier_1_off_high_threshold: 0.93    # Tier 1 — fire when 7%+ off 52w high (blue chips rarely dip 15%)
   fundamentals_must_be_healthy: true
+  dip_bypass_pct: 0.02               # Bypass cooldown if stock drops ≥2pp further since last alert (downward averaging)
+  rsi_gate: 55.0                     # Suppress if RSI > this AND bb_pct_b > 0.30 (momentum healthy = not a real dip)
+
+# Rule 9 — MA Crossover (Phase 4 — golden/death cross for Tier 1 + Tier 2 held positions)
+# Detects the exact day MA50 crosses MA200. Fires infrequently (crossovers are rare).
+# 30-day cooldown prevents re-alerting while averages hover near each other.
+ma_crossover:
+  enabled: true
+  apply_to_tiers:
+    - tier_1
+    - tier_2
+  cooldown_days: 30
 
 # Rule 7 — Concentration drift (Tier 1 + Tier 2 only)
 concentration_drift:

@@ -5,7 +5,7 @@ batch-vs-single-ticker quirks of yfinance, caches expensive series (history,
 fundamentals) for the duration of a single daily run, and provides a small,
 typed surface area:
 
-- ``snapshot(symbol)`` → today's price, day return, 5-day return, volume vs avg
+- ``snapshot(symbol)`` → price, day/5d return, volume, MA50/MA200, Bollinger Bands
 - ``ath(symbol)`` → all-time high (computed from full daily history, max adj close)
 - ``fifty_two_week_high(symbol)`` → 52-week high
 - ``two_hundred_dma(symbol)`` → 200-day moving average
@@ -13,6 +13,12 @@ typed surface area:
 - ``fundamentals(symbol)`` → revenue YoY, op margin trend, EPS revisions, FCF, P/E
 - ``next_earnings(symbol)`` → datetime of next earnings, or None
 - ``recent_news(symbol, limit)`` → list of headline dicts
+
+Technical indicators in PriceSnapshot (Phase 1):
+  ma50, ma200      — from yfinance info dict (Yahoo pre-calculates; zero extra API call)
+  bb_upper/lower   — 20-day Bollinger Bands (2σ), computed from existing 3mo price history
+  bb_pct_b         — %B: 0.0=at lower band, 0.5=mid, 1.0=at upper band (<0 or >1 = outside)
+  above_ma50/200   — boolean convenience flags
 
 If you swap data sources later (Polygon, OpenBB), only this module changes.
 """
@@ -43,9 +49,30 @@ class PriceSnapshot:
     volume_avg_30d: float
     volume_multiple: float  # volume / volume_avg_30d
 
+    # ── Phase 1: Technical indicators ─────────────────────────────────────────
+    # MA50/MA200 sourced from yfinance info dict (Yahoo pre-calculates daily).
+    # BB computed from the 3-month price history already fetched for snapshot().
+    # All default to None so existing call sites don't need to be updated.
+    ma50: float | None = None          # 50-day simple moving average
+    ma200: float | None = None         # 200-day simple moving average
+    bb_upper: float | None = None      # Bollinger upper band  (20d MA + 2σ)
+    bb_lower: float | None = None      # Bollinger lower band  (20d MA − 2σ)
+    bb_pct_b: float | None = None      # %B: 0=lower band, 0.5=mid, 1=upper band
+    above_ma50: bool | None = None     # price > ma50
+    above_ma200: bool | None = None    # price > ma200
+
     @property
     def is_high_volume(self) -> bool:
         return self.volume_multiple >= 1.5
+
+
+@dataclass(frozen=True)
+class EpsQuarter:
+    """One quarter of EPS estimate vs. actual."""
+    period: str          # e.g. "2026-01-31"
+    estimate: float | None
+    actual: float | None
+    surprise_pct: float | None   # (actual - estimate) / |estimate| * 100
 
 
 @dataclass(frozen=True)
@@ -61,7 +88,12 @@ class FundamentalsSnapshot:
     eps_revisions_90d: float | None  # net positive/negative; sign matters
     fcf_yoy: float | None  # negative if FCF turned worse
     analyst_target_mean: float | None
+    analyst_target_high: float | None
+    analyst_target_low: float | None
+    analyst_recommendation: str | None   # e.g. "strong_buy", "buy", "hold", "sell"
+    analyst_count: int | None
     last_earnings_surprise_pct: float | None
+    eps_history: list[EpsQuarter] = field(default_factory=list)  # last 4 quarters, newest first
     raw: dict[str, Any] = field(default_factory=dict, repr=False)
 
 
@@ -115,6 +147,24 @@ class MarketData:
         vol = float(last["Volume"])
         price = float(last["Close"])
         prev_close = float(prev["Close"])
+
+        # ── Technical indicators ──────────────────────────────────────────────
+        # MA50/MA200: Yahoo pre-calculates these in the info dict.
+        # info() is cached per-run so this is a dict lookup after the first call.
+        info_data = self.info(symbol)
+        ma50  = _safe_float(info_data.get("fiftyDayAverage"))
+        ma200 = _safe_float(info_data.get("twoHundredDayAverage"))
+
+        # Bollinger Bands (20-day, 2σ) — pure pandas on price history we already have.
+        closes = df["Close"]
+        bb_mid_s = closes.rolling(20).mean()
+        bb_std_s = closes.rolling(20).std(ddof=1)
+        bb_u = _safe_float((bb_mid_s + 2 * bb_std_s).iloc[-1])
+        bb_l = _safe_float((bb_mid_s - 2 * bb_std_s).iloc[-1])
+        bb_pct_b: float | None = None
+        if bb_u is not None and bb_l is not None and (bb_u - bb_l) > 0:
+            bb_pct_b = (price - bb_l) / (bb_u - bb_l)
+
         return PriceSnapshot(
             symbol=symbol.upper(),
             price=price,
@@ -124,6 +174,13 @@ class MarketData:
             volume=vol,
             volume_avg_30d=avg_vol,
             volume_multiple=vol / avg_vol if avg_vol else 0.0,
+            ma50=ma50,
+            ma200=ma200,
+            bb_upper=bb_u,
+            bb_lower=bb_l,
+            bb_pct_b=bb_pct_b,
+            above_ma50=(price > ma50) if ma50 is not None else None,
+            above_ma200=(price > ma200) if ma200 is not None else None,
         )
 
     def consecutive_up_days(self, symbol: str) -> int:
@@ -171,6 +228,42 @@ class MarketData:
         if pd.isna(latest):
             return None
         return float(latest)
+
+    def ma_crossover(self, symbol: str) -> dict:
+        """Detect a golden or death cross firing today.
+
+        Compares yesterday's MA50/MA200 with today's to identify the exact crossing day:
+          golden cross: MA50_yesterday < MA200_yesterday AND MA50_today >= MA200_today
+          death cross:  MA50_yesterday > MA200_yesterday AND MA50_today <= MA200_today
+
+        Requires at least 201 days of history; returns all-False if insufficient data.
+
+        Returns dict keys:
+          golden (bool), death (bool),
+          ma50 (float | None), ma200 (float | None),
+          gap_pct (float | None)  — positive = MA50 above MA200
+        """
+        df = self.history(symbol, period="1y")
+        closes = df["Close"].dropna()
+        if len(closes) < 201:
+            return {"golden": False, "death": False, "ma50": None, "ma200": None, "gap_pct": None}
+
+        ma50_today  = float(closes.tail(50).mean())
+        ma50_yest   = float(closes.iloc[:-1].tail(50).mean())
+        ma200_today = float(closes.tail(200).mean())
+        ma200_yest  = float(closes.iloc[:-1].tail(200).mean())
+
+        golden  = ma50_yest < ma200_yest and ma50_today >= ma200_today
+        death   = ma50_yest > ma200_yest and ma50_today <= ma200_today
+        gap_pct = (ma50_today - ma200_today) / ma200_today if ma200_today else None
+
+        return {
+            "golden":  golden,
+            "death":   death,
+            "ma50":    ma50_today,
+            "ma200":   ma200_today,
+            "gap_pct": gap_pct,
+        }
 
     def gap_up_on_earnings(self, symbol: str, gap_threshold: float) -> float | None:
         """Return today's gap-up % if today is earnings day and gap >= threshold; else None."""
@@ -234,6 +327,27 @@ class MarketData:
         finally:
             _yf_log.setLevel(_saved_level)
 
+        # EPS beat/miss history — last 4 quarters, newest first.
+        eps_history: list[EpsQuarter] = []
+        try:
+            eh = ticker.earnings_history
+            if eh is not None and not eh.empty:
+                for idx, row in eh.tail(4).iloc[::-1].iterrows():
+                    est = _safe_float(row.get("epsEstimate"))
+                    actual = _safe_float(row.get("epsActual"))
+                    if est is not None and actual is not None and est != 0:
+                        surprise = (actual - est) / abs(est) * 100
+                    else:
+                        surprise = None
+                    eps_history.append(EpsQuarter(
+                        period=str(idx)[:10],
+                        estimate=est,
+                        actual=actual,
+                        surprise_pct=surprise,
+                    ))
+        except Exception:
+            pass
+
         return FundamentalsSnapshot(
             symbol=symbol.upper(),
             trailing_pe=_safe_float(info.get("trailingPE")),
@@ -247,7 +361,12 @@ class MarketData:
             ),
             fcf_yoy=fcf_yoy,
             analyst_target_mean=_safe_float(info.get("targetMeanPrice")),
+            analyst_target_high=_safe_float(info.get("targetHighPrice")),
+            analyst_target_low=_safe_float(info.get("targetLowPrice")),
+            analyst_recommendation=info.get("recommendationKey"),
+            analyst_count=info.get("numberOfAnalystOpinions"),
             last_earnings_surprise_pct=_safe_float(info.get("earningsSurprisePercent")),
+            eps_history=eps_history,
             raw=info,
         )
 

@@ -84,20 +84,20 @@ class TestLotAnalysis:
     def test_long_term_lot_flagged(self):
         lots = [_lot(qty=100, cost=40.0, days_ago=400)]
         pos = _position(lots, price=50.0)
-        rows = _lot_analysis([pos], price=50.0)
+        rows = _lot_analysis([pos], price=50.0, lt_rate=0.15, st_rate=0.35)
         assert rows[0]["is_long_term"] is True
         assert rows[0]["days_held"] == 400
 
     def test_short_term_lot_flagged(self):
         lots = [_lot(qty=50, cost=40.0, days_ago=200)]
         pos = _position(lots, price=50.0)
-        rows = _lot_analysis([pos], price=50.0)
+        rows = _lot_analysis([pos], price=50.0, lt_rate=0.15, st_rate=0.35)
         assert rows[0]["is_long_term"] is False
 
     def test_gain_calculation(self):
         lots = [_lot(qty=100, cost=40.0, days_ago=400)]
         pos = _position(lots, price=50.0)
-        rows = _lot_analysis([pos], price=50.0)
+        rows = _lot_analysis([pos], price=50.0, lt_rate=0.15, st_rate=0.35)
         assert rows[0]["gain_per_share"] == pytest.approx(10.0)
         assert rows[0]["gain_pct"] == pytest.approx(0.25)
         assert rows[0]["gain_total"] == pytest.approx(1000.0)
@@ -105,7 +105,7 @@ class TestLotAnalysis:
     def test_underwater_lot_flagged(self):
         lots = [_lot(qty=100, cost=60.0, days_ago=400)]
         pos = _position(lots, price=50.0)
-        rows = _lot_analysis([pos], price=50.0)
+        rows = _lot_analysis([pos], price=50.0, lt_rate=0.15, st_rate=0.35)
         assert rows[0]["is_profitable"] is False
         assert rows[0]["gain_total"] == pytest.approx(-1000.0)
 
@@ -116,14 +116,14 @@ class TestLotAnalysis:
             _lot(qty=50, cost=40.0, days_ago=100),   # ST profitable
         ]
         pos = _position(lots, price=50.0)
-        rows = _lot_analysis([pos], price=50.0)
+        rows = _lot_analysis([pos], price=50.0, lt_rate=0.15, st_rate=0.35)
         assert rows[0]["is_long_term"] is True
         assert rows[0]["is_profitable"] is True
 
     def test_multiple_positions_combined(self):
         pos1 = _position([_lot(100, 40.0, 400)], price=50.0)
         pos2 = _position([_lot(50, 35.0, 500)], price=50.0)
-        rows = _lot_analysis([pos1, pos2], price=50.0)
+        rows = _lot_analysis([pos1, pos2], price=50.0, lt_rate=0.15, st_rate=0.35)
         assert len(rows) == 2
         total_qty = sum(r["quantity"] for r in rows)
         assert total_qty == 150
