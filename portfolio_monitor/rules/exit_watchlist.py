@@ -100,6 +100,11 @@ class ExitWatchlistRule(Rule):
             is_trim = tier == Tier.TRIM_POOL
             action_word = "trim" if is_trim else "exit"
 
+            fund = ctx.market.fundamentals(symbol)
+            rsi = ctx.market.rsi_14(symbol)
+            news = ctx.market.recent_news(symbol, limit=5)
+            high_52w = ctx.market.fifty_two_week_high(symbol)
+
             payload = {
                 "symbol": symbol,
                 "tier": tier.value,
@@ -116,6 +121,24 @@ class ExitWatchlistRule(Rule):
                 "unrealized_pl": unrealized_pl,
                 "unrealized_pl_pct": unrealized_pl_pct,
                 "lots": lots,
+                # Fundamentals snapshot
+                "fifty_two_week_high": high_52w,
+                "trailing_pe": fund.trailing_pe,
+                "forward_pe": fund.forward_pe,
+                "revenue_yoy": fund.revenue_yoy,
+                "op_margin": fund.op_margin,
+                "analyst_target": fund.analyst_target_mean,
+                "analyst_target_high": fund.analyst_target_high,
+                "analyst_target_low": fund.analyst_target_low,
+                "analyst_recommendation": fund.analyst_recommendation,
+                "analyst_count": fund.analyst_count,
+                "rsi_14": rsi,
+                "eps_history": [
+                    {"period": q.period, "estimate": q.estimate,
+                     "actual": q.actual, "surprise_pct": q.surprise_pct}
+                    for q in fund.eps_history
+                ],
+                "news_headlines": news[:5],
                 **tax,
             }
 

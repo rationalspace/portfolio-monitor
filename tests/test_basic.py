@@ -42,12 +42,10 @@ def test_tier_lookups_for_known_owner_picks():
     tiers = load_tiers(REPO / "tiers.yaml")
     assert tiers.tier_for("GOOGL") == Tier.TIER_1
     assert tiers.tier_for("NFLX") == Tier.TIER_2    # promoted from Tier 3
-    assert tiers.tier_for("DOCN") == Tier.EXIT_POOL  # moved to exit pool — selling position
+    assert tiers.tier_for("DOCN") == Tier.TIER_2      # moved from exit_pool to tier_2 — long-term AI infra hold
     assert tiers.tier_for("PYPL") == Tier.EXIT_POOL
-    assert tiers.tier_for("V") == Tier.EXIT_POOL
-    assert tiers.tier_for("NOW") == Tier.EXIT_POOL
     assert tiers.tier_for("ADBE") == Tier.EXIT_POOL
-    assert tiers.tier_for("S") == Tier.TRIM_POOL     # short-term lots; hold until LTCG then exit
+    # V, NOW removed from exit_pool; S, UBER fully sold — no longer in tiers
     assert tiers.tier_for("COIN") == Tier.CRYPTO_EXPOSURE
     assert tiers.tier_for("FBTC") == Tier.CRYPTO_EXPOSURE
     assert tiers.tier_for("UNKNOWN_TICKER") == Tier.UNCATEGORIZED
@@ -101,6 +99,8 @@ def test_deterioration_signals_compose():
         eps_revisions_90d=-0.08,
         fcf_yoy=-0.20,
         analyst_target_mean=None,
+        analyst_target_high=None, analyst_target_low=None,
+        analyst_recommendation=None, analyst_count=None,
         last_earnings_surprise_pct=None,
     )
     signals = deterioration_signals(fund)
@@ -113,6 +113,8 @@ def test_is_healthy_gate():
         revenue_yoy=0.20, op_margin=0.15,
         op_margin_trend_4q=0.0, eps_revisions_90d=None,
         fcf_yoy=None, analyst_target_mean=None,
+        analyst_target_high=None, analyst_target_low=None,
+        analyst_recommendation=None, analyst_count=None,
         last_earnings_surprise_pct=None,
     )
     cfg = BuyTheDipConfig()
@@ -124,6 +126,8 @@ def test_is_healthy_gate():
         revenue_yoy=0.05, op_margin=0.15,
         op_margin_trend_4q=0.0, eps_revisions_90d=None,
         fcf_yoy=None, analyst_target_mean=None,
+        analyst_target_high=None, analyst_target_low=None,
+        analyst_recommendation=None, analyst_count=None,
         last_earnings_surprise_pct=None,
     )
     ok2, failing2 = is_healthy(fund_unhealthy, cfg)
