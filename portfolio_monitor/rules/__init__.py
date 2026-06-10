@@ -1,4 +1,4 @@
-"""Rule engine — eight rules organized by what they protect against.
+"""Rule engine — nine rules organized by what they protect against.
 
 Every rule subclasses :class:`base.Rule` and is instantiated with the loaded
 :class:`AppConfig`. ``evaluate(ctx)`` returns a list of :class:`base.Alert`
@@ -15,6 +15,7 @@ from .concentration import ConcentrationDriftRule
 from .earnings import EarningsHeadsUpRule
 from .ath_proximity import AthProximityRule
 from .exit_watchlist import ExitWatchlistRule
+from .ma_crossover import MaCrossoverRule
 from .sell_into_strength import SellIntoStrengthRule
 from .tier_weakness import Tier3WeaknessRule, Tier4WeaknessRule
 
@@ -29,6 +30,7 @@ ALL_RULES: list[type[Rule]] = [
     TopUpCompounderRule,
     ConcentrationDriftRule,
     EarningsHeadsUpRule,
+    MaCrossoverRule,
 ]
 
 __all__ = [
@@ -47,4 +49,5 @@ __all__ = [
     "TopUpCompounderRule",
     "ConcentrationDriftRule",
     "EarningsHeadsUpRule",
+    "MaCrossoverRule",
 ]

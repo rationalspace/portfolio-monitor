@@ -40,6 +40,7 @@ class PerTickerOverride(BaseModel):
     concentration_exempt: bool = False
     alert_cooldown_days: int | None = None
     sell_into_strength_pop_threshold: float | None = None
+    top_up_off_high_threshold: float | None = None  # Override tier default; e.g. 0.90 = alert at 10% off high
 
 
 class TierMap(BaseModel):
@@ -181,6 +182,15 @@ class TopUpConfig(BaseModel):
     off_high_threshold: float = 0.85           # Tier 2 threshold (15% off high)
     tier_1_off_high_threshold: float = 0.93    # Tier 1 threshold (7% off high — blue chips rarely dip 15%)
     fundamentals_must_be_healthy: bool = True
+    dip_bypass_pct: float = 0.02               # Bypass 7-day cooldown if stock drops ≥2pp further (downward averaging)
+    rsi_gate: float = 55.0                     # Phase 2: suppress if RSI > this AND not near BB lower (not a real dip)
+
+
+class MaCrossoverConfig(BaseModel):
+    """Phase 4 — golden/death cross detection for Tier 1 and Tier 2 positions."""
+    enabled: bool = True
+    apply_to_tiers: list[str] = Field(default_factory=lambda: ["tier_1", "tier_2"])
+    cooldown_days: int = 30    # Crossovers are rare; 30-day cooldown prevents re-alerting on proximity days
 
 
 class ConcentrationConfig(BaseModel):
@@ -233,6 +243,7 @@ class AppConfig(BaseModel):
     earnings_heads_up: EarningsHeadsUpConfig = Field(default_factory=EarningsHeadsUpConfig)
     data_sources: DataSourcesConfig = Field(default_factory=DataSourcesConfig)
     logging: LoggingConfig = Field(default_factory=LoggingConfig)
+    ma_crossover: MaCrossoverConfig = Field(default_factory=MaCrossoverConfig)
 
 
 def _load_yaml(path: Path) -> dict[str, Any]:

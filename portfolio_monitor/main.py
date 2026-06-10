@@ -92,8 +92,27 @@ def run_once(*, dry_run: bool = False, send_digest: bool = False) -> int:
             rule_specific_days = getattr(rule_specific, "cooldown_days", None) if rule_specific else None
             cooldown_days = per_ticker or rule_specific_days or config.alerts.cooldown_days
             if store.in_cooldown(alert.symbol, alert.rule, cooldown_days):
-                log.debug("Cooldown skip: %s/%s", alert.symbol, alert.rule)
-                continue
+                # Dip-bypass: if the stock has fallen meaningfully further since
+                # the last alert, override the cooldown so the user can average down.
+                # Only applies to rules that carry an off_high_pct in the payload.
+                current_dip = alert.payload.get("off_high_pct")
+                if current_dip is not None:
+                    last_rec = store.last_alert(alert.symbol, alert.rule)
+                    last_dip = last_rec.payload.get("off_high_pct") if last_rec else None
+                    rule_cfg = getattr(config, alert.rule, None)
+                    bypass_pct = getattr(rule_cfg, "dip_bypass_pct", 0.02)
+                    if last_dip is not None and (current_dip - last_dip) < -bypass_pct:
+                        log.info(
+                            "Cooldown bypass %s/%s: deeper dip %.1f%% → %.1f%% (>%.0f%% further)",
+                            alert.symbol, alert.rule,
+                            last_dip * 100, current_dip * 100, bypass_pct * 100,
+                        )
+                    else:
+                        log.debug("Cooldown skip: %s/%s", alert.symbol, alert.rule)
+                        continue
+                else:
+                    log.debug("Cooldown skip: %s/%s", alert.symbol, alert.rule)
+                    continue
 
             if compliance is not None:
                 alert.payload["compliance"] = {
@@ -104,6 +123,11 @@ def run_once(*, dry_run: bool = False, send_digest: bool = False) -> int:
                     "warning": compliance.warning,
                     "critical": compliance.critical,
                 }
+
+            if dry_run:
+                log.info("[DRY-RUN] Would record + dispatch: %s [%s]", alert.title, alert.severity.value)
+                sent_count += 1
+                continue
 
             store.record(
                 symbol=alert.symbol,

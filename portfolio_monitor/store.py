@@ -99,6 +99,27 @@ class Store:
             )
         return int(cur.lastrowid)
 
+    def last_alert(self, symbol: str, rule: str) -> AlertRecord | None:
+        """Return the most recent alert for (symbol, rule), or None."""
+        with self._conn() as conn:
+            row = conn.execute(
+                "SELECT id, ts_utc, symbol, rule, severity, title, payload_json "
+                "FROM alerts WHERE symbol = ? AND rule = ? "
+                "ORDER BY ts_utc DESC LIMIT 1",
+                (symbol.upper(), rule),
+            ).fetchone()
+        if row is None:
+            return None
+        return AlertRecord(
+            id=row["id"],
+            ts_utc=datetime.fromisoformat(row["ts_utc"]),
+            symbol=row["symbol"],
+            rule=row["rule"],
+            severity=row["severity"],
+            title=row["title"],
+            payload=json.loads(row["payload_json"]),
+        )
+
     def recent(self, limit: int = 50) -> list[AlertRecord]:
         with self._conn() as conn:
             rows = conn.execute(
