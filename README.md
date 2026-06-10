@@ -12,13 +12,13 @@ SnapTrade (brokerage OAuth) ──► positions + lot-level data
                                     │
                                     ▼
    yfinance (prices, ATH, ─────► Alert engine (Python)  ──► Gmail SMTP
-   fundamentals, news)              │                        (HTML alerts +
-                                    ▼                         weekly digest)
+   fundamentals, news,              │                        (HTML alerts +
+   MA50/MA200, Bol. Bands)          ▼                         weekly digest)
                             launchd (4:30–8 PM ET, Mon–Fri)
                             Catch-up: fires on wake if missed
 ```
 
-## The 10 rules
+## The 9 rules
 
 | # | Rule | Applies to | Fires when |
 |---|---|---|---|
@@ -29,9 +29,48 @@ SnapTrade (brokerage OAuth) ──► positions + lot-level data
 | 3 | **Tier 3 Weakness** | Tier 3 | Drawdown >15% + below 200-DMA + fundamentals signal |
 | 4 | **Tier 4 Weakness** | Tier 4 | Drawdown >25% + below 200-DMA + fundamentals signal |
 | 5 | **Buy The Dip** | Watchlist (not held) | Off-high ≤85% + RSI<40 + healthy fundamentals |
-| 6 | **Top-Up Compounder** | Watchlist (held) | Existing Tier 1/2 name pulls back to ≤85% of 52w high |
+| 6 | **Top-Up Compounder** | Watchlist (held Tier 1/2) | Pullback to threshold — enriched with technical quality tier (see below) |
 | 7 | **Concentration Drift** | Tier 1 + 2 | Position exceeds 12% of portfolio (digest only) |
 | 8 | **Earnings Heads-Up** | All | Earnings within 3 trading days (digest only) |
+| 9 | **MA Crossover** | Tier 1 + 2 | 50-day average crosses 200-day average — golden or death cross |
+
+## Technical indicators
+
+Every `PriceSnapshot` carries technical indicators at zero extra API cost:
+
+| Field | Source | What it means |
+|---|---|---|
+| `ma50` | yfinance info dict (Yahoo pre-calculates) | 50-day simple moving average |
+| `ma200` | yfinance info dict | 200-day simple moving average |
+| `bb_upper` / `bb_lower` | 20-day Bollinger Bands (2σ), pandas rolling | Upper/lower bounds of the 20-day price range |
+| `bb_pct_b` | `(price − bb_lower) / (bb_upper − bb_lower)` | 0 = at floor, 0.5 = mid, 1 = at ceiling |
+| `above_ma50` / `above_ma200` | Boolean flags | Is price above the 50/200-day average? |
+
+### Rule 6 — Top-Up Compounder quality tiers
+
+Alerts are tiered by technical quality. Severity and title adapt to the setup:
+
+| Tier | Condition | Severity | Example title |
+|---|---|---|---|
+| `SCREAMING_BUY` | Near BB lower (< 15%) **and** RSI oversold (< 42) | HIGH | "NVDA — Strong entry: at price floor with selling exhausted" |
+| `STRONG_DIP` | At BB lower **or** deeply oversold (RSI < 35) | HIGH | "AVGO — Good entry: near the price floor, 13% off peak" |
+| `HEALTHY_DIP` | Below threshold, above MA200, trend intact | MEDIUM | "MSFT — Standard entry: 9% off peak, long-term trend intact" |
+| `TREND_CAUTION` | Below threshold but below MA200 (trend broken) | DIGEST | "QCOM — Threshold met but long-term trend is under pressure" |
+
+**RSI gate**: suppresses alerts when RSI > 55 and price isn't near BB lower — the stock isn't in a real dip technically.
+
+The email includes a visual gradient bar showing where price sits in its 20-day range, MA50/MA200 status pills, and a plain-English "What the chart is telling you" paragraph — no jargon.
+
+### Rule 9 — MA Crossover
+
+Detects the exact day the 50-day average crosses the 200-day average for held Tier 1/2 positions:
+
+- **Golden cross** (MA50 crosses above MA200): `MEDIUM` — *"NVDA — Recovery momentum confirmed"*
+- **Death cross** (MA50 crosses below MA200): `HIGH` — *"MSFT — Selling pressure is becoming a trend (not just a dip)"*
+
+30-day cooldown prevents re-alerting when averages hover near each other. Plain-English body explains what the crossing means for a long-term hold (watch signal, not an exit trigger).
+
+---
 
 All sell-side alerts include:
 - **Day % change + dollar value change** on the full position
@@ -49,15 +88,25 @@ All assignments live in `tiers.yaml` (kept local — copy from `tiers.example.ya
 | `tier_4` | Speculative growth — tighter leash | Tighter — lower drawdown threshold before alert fires |
 | `exit_pool` | Positions decided to exit — hunt every rally | None — alerts on any meaningful pop or consecutive up days |
 | `crypto_exposure` | Crypto-linked ETFs | Sell-into-strength only; fundamentals rules disabled |
-| `watchlist` | Buy candidates — not yet fully positioned | Buy-the-dip alerts when quality names pull back |
+| `watchlist` | Buy candidates — dip-buy and top-up rules | Technical quality tiers on every alert |
 | `index_fund` | Broad index funds | Excluded from all single-name rules |
+
+### Per-ticker overrides (`tiers.yaml`)
+
+```yaml
+overrides:
+  PLTR:
+    top_up_off_high_threshold: 0.90   # Alert at 10% off high instead of default 15%
+  MU:
+    top_up_off_high_threshold: 0.80   # Cyclical — wait for a real 20% dip
+```
 
 ## Scheduling & catch-up
 
 - **launchd** fires every 30 min from 4:30–8:00 PM ET, Mon–Fri
 - **Catch-up**: if the Mac was asleep at 4:30, the next wake fires immediately
 - **Sentinel file** (`~/.portfolio-monitor-last-run`) ensures exactly one run per calendar day
-- **7-day cooldown** per (symbol, rule) pair to prevent alert fatigue
+- **7-day cooldown** per (symbol, rule) pair — MA Crossover uses 30-day cooldown
 
 ## Setup
 
@@ -79,8 +128,6 @@ SnapTrade is the OAuth bridge that connects this tool to your brokerage account.
    ```
    This opens a browser to connect your brokerage account via OAuth.
 3. Store the four credentials in macOS Keychain (see step 3 below)
-
-SnapTrade supports 50+ brokers — connect whichever account holds your positions.
 
 ### 3. Secrets (macOS Keychain)
 ```bash
@@ -156,6 +203,20 @@ Two YAML files drive everything — no code changes ever needed:
 - **`tiers.yaml`** — tier assignments, watchlist, exit pool, per-ticker overrides *(kept local — copy from `tiers.example.yaml`)*
 - **`config.yaml`** — rule thresholds, on/off switches, scheduler timing
 
+Key config knobs:
+
+```yaml
+top_up_compounder:
+  tier_1_off_high_threshold: 0.93  # Alert when Tier 1 is 7%+ off 52w high
+  off_high_threshold: 0.85         # Tier 2: 15%+ off high
+  rsi_gate: 55.0                   # Suppress if RSI > this and not near BB lower
+
+ma_crossover:
+  enabled: true
+  apply_to_tiers: [tier_1, tier_2]
+  cooldown_days: 30
+```
+
 A `realized_pnl.yaml` ledger tracks closed positions (also kept local). Copy from `realized_pnl.example.yaml` to start your own.
 
 ## Ghostfolio (optional dashboard)
@@ -178,8 +239,6 @@ python -m portfolio_monitor.scripts.broker_to_ghostfolio \
   --account-map "<YOUR_ACCOUNT_2>=ghostfolio-account-id-2"
 ```
 
-Dividends and unmapped accounts are automatically excluded.
-
 ## Project layout
 
 ```
@@ -191,29 +250,31 @@ portfolio-monitor/
 ├── docker-compose.yml          # Optional Ghostfolio stack
 ├── .env.example                # Ghostfolio secrets template
 ├── portfolio_monitor/
-│   ├── main.py                 # Daily orchestration
-│   ├── tiers_loader.py         # YAML → typed config + AppConfig
+│   ├── main.py                 # Daily orchestration loop
+│   ├── tiers_loader.py         # YAML → AppConfig, TierMap, MaCrossoverConfig, TopUpConfig...
 │   ├── portfolio_types.py      # Position, Lot, Portfolio dataclasses
-│   ├── snaptrade_client.py     # Live holdings via SnapTrade
-│   ├── market_data.py          # yfinance: prices, ATH, fundamentals, news
-│   ├── store.py                # SQLite cooldown log
+│   ├── snaptrade_client.py     # Live holdings via SnapTrade OAuth
+│   ├── market_data.py          # yfinance: prices, ATH, MA50/200, Bollinger Bands, RSI, news
+│   ├── store.py                # SQLite cooldown + alert dedup log
 │   ├── email_dispatch.py       # Jinja2 HTML → Gmail SMTP
 │   ├── rules/
-│   │   ├── ath_proximity.py    # Rule 0a — ATH grind alert (Tier 1+2)
-│   │   ├── exit_watchlist.py   # Rule 0b — momentum exit (Exit Pool)
-│   │   ├── sell_into_strength.py
-│   │   ├── capitulation.py
-│   │   ├── tier_weakness.py
-│   │   ├── buy_the_dip.py
-│   │   ├── concentration.py
-│   │   └── earnings.py
+│   │   ├── base.py             # Alert, EvaluationContext, Rule, Severity
+│   │   ├── ath_proximity.py    # Rule 0a
+│   │   ├── exit_watchlist.py   # Rule 0b
+│   │   ├── sell_into_strength.py  # Rule 1
+│   │   ├── capitulation.py     # Rule 2
+│   │   ├── tier_weakness.py    # Rules 3 + 4
+│   │   ├── buy_the_dip.py      # Rules 5 + 6 (with quality tiers)
+│   │   ├── concentration.py    # Rule 7
+│   │   ├── earnings.py         # Rule 8
+│   │   └── ma_crossover.py     # Rule 9 — golden/death cross
 │   ├── templates/
-│   │   ├── alert.html.j2       # Per-alert email (lot breakdown, day change)
+│   │   ├── alert.html.j2       # Per-alert email (BB bar, tier badge, lot breakdown)
 │   │   └── digest.html.j2      # Weekly Saturday digest
 │   └── scripts/
 │       ├── run_guarded.py      # Time-gate + sentinel → main.run_once()
 │       └── broker_to_ghostfolio.py
-└── tests/                      # Tests, no network required
+└── tests/                      # All offline — no network required
 ```
 
 ## Tests
