@@ -134,6 +134,37 @@ def test_is_healthy_gate():
     assert not ok2 and failing2  # rev YoY 5% < 10% floor
 
 
+def test_is_healthy_gate_rejects_absurd_pe():
+    """A 32% dip off the high doesn't make a 250x forward P/E stock 'cheap'.
+    Catches the CBRS case: revenue/margin pass, but the multiple is still absurd."""
+    fund_expensive = FundamentalsSnapshot(
+        symbol="CBRS", trailing_pe=518.0, forward_pe=252.0,
+        revenue_yoy=0.15, op_margin=0.20,
+        op_margin_trend_4q=0.0, eps_revisions_90d=None,
+        fcf_yoy=None, analyst_target_mean=None,
+        analyst_target_high=None, analyst_target_low=None,
+        analyst_recommendation=None, analyst_count=None,
+        last_earnings_surprise_pct=None,
+    )
+    cfg = BuyTheDipConfig()
+    ok, failing = is_healthy(fund_expensive, cfg)
+    assert not ok
+    assert any("forward P/E" in f for f in failing)
+
+    # A reasonably priced growth name should still pass.
+    fund_reasonable = FundamentalsSnapshot(
+        symbol="NVDA", trailing_pe=32.0, forward_pe=16.0,
+        revenue_yoy=0.15, op_margin=0.20,
+        op_margin_trend_4q=0.0, eps_revisions_90d=None,
+        fcf_yoy=None, analyst_target_mean=None,
+        analyst_target_high=None, analyst_target_low=None,
+        analyst_recommendation=None, analyst_count=None,
+        last_earnings_surprise_pct=None,
+    )
+    ok2, failing2 = is_healthy(fund_reasonable, cfg)
+    assert ok2 and not failing2
+
+
 def test_store_cooldown_roundtrip(tmp_path):
     store = Store(db_path=tmp_path / "state.db")
     assert not store.in_cooldown("PYPL", "sell_into_strength", 7)

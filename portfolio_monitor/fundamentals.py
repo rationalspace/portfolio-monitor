@@ -38,11 +38,19 @@ def deterioration_signals(fund: FundamentalsSnapshot) -> list[str]:
 def is_healthy(fund: FundamentalsSnapshot, cfg: BuyTheDipConfig) -> tuple[bool, list[str]]:
     """Return (ok, reasons_failing).
 
-    Used by buy-the-dip and top-up rules to confirm a dip isn't a value trap.
+    Used by buy-the-dip and top-up rules to confirm a dip isn't a value trap —
+    AND that being "off the high" doesn't just mean less absurdly priced.
+    A -30% dip from a 250x forward P/E is still a 175x stock, not a bargain.
     """
     failing: list[str] = []
     if fund.revenue_yoy is not None and fund.revenue_yoy < cfg.rev_yoy_min:
         failing.append(f"revenue YoY {fund.revenue_yoy:+.1%} below {cfg.rev_yoy_min:+.1%}")
     if fund.op_margin is not None and fund.op_margin < cfg.op_margin_min:
         failing.append(f"op margin {fund.op_margin:+.1%} below floor")
+    if (cfg.forward_pe_max is not None and fund.forward_pe is not None
+            and fund.forward_pe > cfg.forward_pe_max):
+        failing.append(f"forward P/E {fund.forward_pe:.0f}x above {cfg.forward_pe_max:.0f}x ceiling")
+    if (cfg.trailing_pe_max is not None and fund.trailing_pe is not None
+            and fund.trailing_pe > cfg.trailing_pe_max):
+        failing.append(f"trailing P/E {fund.trailing_pe:.0f}x above {cfg.trailing_pe_max:.0f}x ceiling")
     return (len(failing) == 0, failing)

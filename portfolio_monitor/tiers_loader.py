@@ -175,6 +175,12 @@ class BuyTheDipConfig(BaseModel):
     rev_yoy_min: float = 0.10
     op_margin_min: float = 0.0
     exclude_if_recent_guidance_cut: bool = True
+    # A big % off the high isn't "cheap" if the multiple is still absurd —
+    # a -32% dip from $300 to $200 means nothing if forward P/E is still 250x.
+    # None on either field = skip that check (e.g. forward estimates unavailable
+    # for a name with only weeks of public trading history).
+    forward_pe_max: float | None = 75.0
+    trailing_pe_max: float | None = 100.0
 
 
 class TopUpConfig(BaseModel):
