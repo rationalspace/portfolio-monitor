@@ -212,6 +212,12 @@ class EarningsHeadsUpConfig(BaseModel):
     digest_only: bool = True
 
 
+class AkshatTradeConfig(BaseModel):
+    enabled: bool = True
+    # 1-day cooldown: re-alert if the same trade appears again (shouldn't normally happen)
+    cooldown_days: int = 1
+
+
 class SchedulerConfig(BaseModel):
     run_after_close_et: str = "16:30"
     weekly_digest_day: str = "saturday"
@@ -247,6 +253,7 @@ class AppConfig(BaseModel):
     top_up_compounder: TopUpConfig = Field(default_factory=TopUpConfig)
     concentration_drift: ConcentrationConfig = Field(default_factory=ConcentrationConfig)
     earnings_heads_up: EarningsHeadsUpConfig = Field(default_factory=EarningsHeadsUpConfig)
+    akshat_trade: AkshatTradeConfig = Field(default_factory=AkshatTradeConfig)
     data_sources: DataSourcesConfig = Field(default_factory=DataSourcesConfig)
     logging: LoggingConfig = Field(default_factory=LoggingConfig)
     ma_crossover: MaCrossoverConfig = Field(default_factory=MaCrossoverConfig)

@@ -18,7 +18,7 @@ SnapTrade (brokerage OAuth) ──► positions + lot-level data
                             Catch-up: fires on wake if missed
 ```
 
-## The 9 rules
+## The 10 rules
 
 | # | Rule | Applies to | Fires when |
 |---|---|---|---|
@@ -28,11 +28,27 @@ SnapTrade (brokerage OAuth) ──► positions + lot-level data
 | 2 | **Capitulation** | Exit Pool | Loss >35% + fundamental deterioration (digest only) |
 | 3 | **Tier 3 Weakness** | Tier 3 | Drawdown >15% + below 200-DMA + fundamentals signal |
 | 4 | **Tier 4 Weakness** | Tier 4 | Drawdown >25% + below 200-DMA + fundamentals signal |
-| 5 | **Buy The Dip** | Watchlist (not held) | Off-high ≤85% + RSI<40 + healthy fundamentals |
+| 5 | **Buy The Dip** | Watchlist (not held) | Off-high ≤85% + RSI<40 + healthy fundamentals (PE ceilings apply) |
 | 6 | **Top-Up Compounder** | Watchlist (held Tier 1/2) | Pullback to threshold — enriched with technical quality tier (see below) |
 | 7 | **Concentration Drift** | Tier 1 + 2 | Position exceeds 12% of portfolio (digest only) |
 | 8 | **Earnings Heads-Up** | All | Earnings within 3 trading days (digest only) |
 | 9 | **MA Crossover** | Tier 1 + 2 | 50-day average crosses 200-day average — golden or death cross |
+| 10 | **Akshat Trade Signal** | WisdomHatch watchlist | New buy/sell detected on Akshat's portfolio page — cross-referenced against your tiers and fundamentals |
+
+### Rule 10 — Akshat Trade Signal
+
+Scrapes https://wisdomhatch.com/akshat-us-portfolio/ after every run using a headless browser (Playwright + stealth mode to bypass CleanTalk anti-bot). New trades are detected via SQLite change-tracking (`akshat_trades.db`) — only first-time-seen trades generate alerts.
+
+Severity logic:
+
+| Condition | Severity |
+|---|---|
+| Akshat buys something on your Tier 1/2 watchlist | HIGH |
+| Akshat sells something you currently hold | HIGH |
+| New name (not on watchlist), fundamentals healthy | MEDIUM |
+| Akshat buys Tier 3/4 name, or fundamentals fail PE/margin gates | DIGEST |
+
+Credentials (`wisdomhatch_email`, `wisdomhatch_password`) are stored in macOS Keychain under the `portfolio-monitor` service — never in any file. Run `portfolio-monitor-bootstrap` to set or update them.
 
 ## Technical indicators
 

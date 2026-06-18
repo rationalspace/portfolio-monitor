@@ -19,6 +19,8 @@ dependencies = [
     "pydantic>=2.7",
     "snaptrade-python-sdk>=11.0",
     "python-dateutil>=2.9",
+    "playwright>=1.40",
+    "playwright-stealth>=2.0",
 ]
 
 [project.optional-dependencies]
