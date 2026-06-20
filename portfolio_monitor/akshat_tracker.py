@@ -51,7 +51,7 @@ def _get_db(db_path: Path = DB_PATH) -> sqlite3.Connection:
             quantity    REAL,
             notes       TEXT,
             seen_at     TEXT NOT NULL,
-            UNIQUE(symbol, direction, trade_date, notes)
+            UNIQUE(symbol, direction, trade_date, price, quantity)
         )
     """)
     conn.commit()
@@ -59,20 +59,32 @@ def _get_db(db_path: Path = DB_PATH) -> sqlite3.Connection:
 
 
 def _filter_new(trades: list[AkshatTrade], db_path: Path = DB_PATH) -> list[AkshatTrade]:
-    """Return only trades not yet seen; persist the new ones."""
+    """Return only trades not yet seen; persist the new ones.
+
+    Dedup key is (symbol, direction, trade_date, price, quantity) — the
+    semantically stable fields. ``notes`` is excluded because it embeds the
+    page's "Total Allocation changed to X%" text, which drifts day to day
+    for the same real-world trade and would otherwise defeat dedup (checked
+    via a manual SELECT rather than relying solely on the UNIQUE constraint,
+    since older on-disk DBs may predate the corrected constraint above).
+    """
     conn = _get_db(db_path)
     new: list[AkshatTrade] = []
     now = datetime.utcnow().isoformat()
     for t in trades:
-        try:
-            conn.execute(
-                "INSERT INTO seen_trades (symbol, direction, trade_date, price, quantity, notes, seen_at) "
-                "VALUES (?, ?, ?, ?, ?, ?, ?)",
-                (t.symbol, t.direction, t.trade_date, t.price, t.quantity, t.notes, now),
-            )
-            new.append(t)
-        except sqlite3.IntegrityError:
-            pass  # already seen
+        existing = conn.execute(
+            "SELECT 1 FROM seen_trades WHERE symbol = ? AND direction = ? AND trade_date = ? "
+            "AND price IS ? AND quantity IS ?",
+            (t.symbol, t.direction, t.trade_date, t.price, t.quantity),
+        ).fetchone()
+        if existing:
+            continue
+        conn.execute(
+            "INSERT INTO seen_trades (symbol, direction, trade_date, price, quantity, notes, seen_at) "
+            "VALUES (?, ?, ?, ?, ?, ?, ?)",
+            (t.symbol, t.direction, t.trade_date, t.price, t.quantity, t.notes, now),
+        )
+        new.append(t)
     conn.commit()
     conn.close()
     return new

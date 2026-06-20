@@ -11,7 +11,7 @@
     <div style="display: inline-block; padding: 4px 10px; border-radius: 4px; color: #fff; font-size: 12px; font-weight: 600; background: {% if severity == 'high' %}#c0392b{% elif severity == 'medium' %}#d68910{% else %}#34495e{% endif %};">
       {{ severity|upper }}
     </div>
-    <span style="margin-left: 8px; font-size: 12px; color: #888;">{{ alert.rule.replace('_', ' ')|title }}</span>
+    <span style="margin-left: 8px; font-size: 12px; color: #888;">{{ alert.rule|humanize_rule }}</span>
 
     <h1 style="margin: 12px 0 8px; font-size: 22px; color: #2c3e50;">{{ alert.title }}</h1>
     <p style="margin: 0 0 16px; color: #555;">{{ alert.body }}</p>
@@ -543,6 +543,13 @@
       {% if c.critical %} ⚠️ CRITICAL — near quarterly limit{% elif c.warning %} ⚠️ WARNING — 80%+ used{% endif %}
     </div>
     {% endif %}
+
+    <div style="margin-top: 16px;">
+      <a href="http://localhost:8765/second-opinion?symbol={{ alert.symbol }}&rule={{ alert.rule }}&date={{ alert.fired_at.strftime('%Y-%m-%d') }}"
+         style="display: inline-block; padding: 8px 14px; border-radius: 4px; background: #2c3e50; color: #fff; font-size: 13px; font-weight: 600; text-decoration: none;">
+        Get a Second Opinion →
+      </a>
+    </div>
 
     <div style="margin-top: 24px; padding-top: 16px; border-top: 1px solid #eee; font-size: 12px; color: #999;">
       Portfolio Monitor · {{ alert.fired_at.strftime('%Y-%m-%d %H:%M UTC') }} · Tier: {{ p.tier or 'n/a' }}

@@ -13,7 +13,7 @@
 
     {% for rule, items in groups.items() %}
     <h2 style="font-size: 15px; color: #2c3e50; margin: 24px 0 8px; padding-bottom: 6px; border-bottom: 1px solid #eee;">
-      {{ rule.replace('_', ' ')|title }} <span style="color:#888; font-weight: 400;">({{ items|length }})</span>
+      {{ rule|humanize_rule }} <span style="color:#888; font-weight: 400;">({{ items|length }})</span>
     </h2>
     <ul style="margin: 0; padding-left: 20px; color: #555;">
       {% for a in items %}
@@ -22,6 +22,8 @@
         {% if a.payload.position_pct is defined %}
         ({{ "{:.1%}".format(a.payload.position_pct) }} of portfolio)
         {% endif %}
+        <a href="http://localhost:8765/second-opinion?symbol={{ a.symbol }}&rule={{ a.rule }}&date={{ a.fired_at.strftime('%Y-%m-%d') }}"
+           style="margin-left: 6px; font-size: 12px; color: #2c3e50; text-decoration: none;">[Second Opinion]</a>
       </li>
       {% endfor %}
     </ul>

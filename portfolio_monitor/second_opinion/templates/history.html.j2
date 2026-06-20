@@ -1,0 +1,26 @@
+{% extends "_layout.html.j2" %}
+{% block title %}Second Opinion history{% if symbol %} · {{ symbol }}{% endif %}{% endblock %}
+{% block content %}
+  <h1 style="margin: 0 0 16px; font-size: 20px;">
+    {% if symbol %}Second Opinion history · {{ symbol }}{% else %}All Second Opinions{% endif %}
+  </h1>
+  {% if not records %}
+  <p style="color: #888;">No entries yet.</p>
+  {% endif %}
+  {% for r in records %}
+  <div style="padding: 12px 0; border-bottom: 1px solid #eee;">
+    <div style="font-size: 13px; color: #888;">
+      {{ r.requested_at.strftime('%Y-%m-%d %H:%M UTC') }} · {{ r.rule|humanize_rule }}
+      {% if r.alert_date %} · alert {{ r.alert_date }}{% endif %}
+    </div>
+    <div style="font-weight: 600; margin: 2px 0 4px;">
+      <a href="/opinion/{{ r.id }}" style="color: #2c3e50; text-decoration: none;">{{ r.symbol }}</a>
+      {% if not symbol %}
+      <a href="/history/{{ r.symbol }}" style="font-size: 12px; color: #888; text-decoration: none; margin-left: 6px;">(all for {{ r.symbol }})</a>
+      {% endif %}
+    </div>
+    <div style="font-size: 14px; color: #444;">{{ r.response_markdown[:280] }}{% if r.response_markdown|length > 280 %}...{% endif %}</div>
+    <a href="/opinion/{{ r.id }}" style="font-size: 12px; color: #2c3e50; text-decoration: none;">Read full opinion &rarr;</a>
+  </div>
+  {% endfor %}
+{% endblock %}

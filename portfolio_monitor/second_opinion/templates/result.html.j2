@@ -1,0 +1,17 @@
+{% extends "_layout.html.j2" %}
+{% block title %}Second Opinion · {{ record.symbol }}{% endblock %}
+{% block content %}
+  <div style="display: inline-block; padding: 4px 10px; border-radius: 4px; color: #fff; font-size: 12px; font-weight: 600; background: #2c3e50;">
+    {{ record.rule|humanize_rule }}
+  </div>
+  <h1 style="margin: 12px 0 4px; font-size: 22px;">{{ record.symbol }}</h1>
+  <p style="margin: 0 0 16px; color: #888; font-size: 13px;">
+    Alert date: {{ record.alert_date or 'n/a' }} · Requested {{ record.requested_at.strftime('%Y-%m-%d %H:%M UTC') }}
+  </p>
+  <div style="font-size: 15px; line-height: 1.6; white-space: pre-wrap;">{{ record.response_markdown }}</div>
+  <div style="margin-top: 24px; padding-top: 16px; border-top: 1px solid #eee;">
+    <a href="/history/{{ record.symbol }}" style="font-size: 13px; color: #2c3e50; text-decoration: none;">
+      View all Second Opinions for {{ record.symbol }} &rarr;
+    </a>
+  </div>
+{% endblock %}

@@ -19,6 +19,7 @@ from typing import Iterable
 
 from jinja2 import Environment, FileSystemLoader, select_autoescape
 
+from .humanize import humanize_rule_name
 from .rules.base import Alert, Severity
 from .secrets import SecretKey, get_secret
 from .tiers_loader import EmailConfig
@@ -37,6 +38,7 @@ class EmailDispatcher:
             trim_blocks=True,
             lstrip_blocks=True,
         )
+        self.env.filters["humanize_rule"] = humanize_rule_name
 
     # ------------------------------------------------------------------ public
 

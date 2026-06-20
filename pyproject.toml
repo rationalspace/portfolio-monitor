@@ -21,6 +21,8 @@ dependencies = [
     "python-dateutil>=2.9",
     "playwright>=1.40",
     "playwright-stealth>=2.0",
+    "fastapi>=0.110",
+    "uvicorn>=0.29",
 ]
 
 [project.optional-dependencies]
@@ -34,6 +36,7 @@ dev = [
 portfolio-monitor = "portfolio_monitor.main:cli"
 portfolio-monitor-bootstrap = "portfolio_monitor.scripts.bootstrap_keychain:main"
 portfolio-monitor-run-once = "portfolio_monitor.scripts.run_once:main"
+portfolio-monitor-second-opinion = "portfolio_monitor.scripts.run_second_opinion_server:main"
 
 [tool.hatch.build.targets.wheel]
 packages = ["portfolio_monitor"]
