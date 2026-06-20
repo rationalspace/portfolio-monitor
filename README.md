@@ -5,6 +5,8 @@ Designed to *protect compounders, trim near all-time highs, prune laggards on ra
 
 Connects to your brokerage via [SnapTrade](https://snaptrade.com) (supports 50+ brokers).
 
+The alert engine itself is **deterministic, rules-based** — no LLM in the decision path that decides whether/when an alert fires. What's new is a second layer on top: every alert email links to a **local AI follow-up** that runs a grounded LLM analysis of that specific alert on demand (see [AI layer — Second Opinion](#ai-layer--second-opinion) below). The rules decide *whether* something is alert-worthy; the AI layer helps you reason about *what to do about it*.
+
 ## Architecture
 
 ```
@@ -16,6 +18,18 @@ SnapTrade (brokerage OAuth) ──► positions + lot-level data
    MA50/MA200, Bol. Bands)          ▼                         weekly digest)
                             launchd (4:30–8 PM ET, Mon–Fri)
                             Catch-up: fires on wake if missed
+
+Alert email ──click "Second Opinion"──► Local FastAPI server (localhost:8765)
+                                              │  pre-assembles: live snapshot,
+                                              │  fundamentals, LTCG status,
+                                              │  tier conviction notes, recent
+                                              │  alert/copy-trade history, news
+                                              ▼
+                                         claude -p (headless, zero tool access)
+                                              │  "two hats" prompt: analyst +
+                                              │  personal advisor synthesis
+                                              ▼
+                                    second_opinions.db (browsable history)
 ```
 
 ## The 10 rules
@@ -33,22 +47,22 @@ SnapTrade (brokerage OAuth) ──► positions + lot-level data
 | 7 | **Concentration Drift** | Tier 1 + 2 | Position exceeds 12% of portfolio (digest only) |
 | 8 | **Earnings Heads-Up** | All | Earnings within 3 trading days (digest only) |
 | 9 | **MA Crossover** | Tier 1 + 2 | 50-day average crosses 200-day average — golden or death cross |
-| 10 | **Akshat Trade Signal** | WisdomHatch watchlist | New buy/sell detected on Akshat's portfolio page — cross-referenced against your tiers and fundamentals |
+| 10 | **Copy-Trade Signal** | Tracked external portfolio (optional) | New buy/sell detected on a subscription-gated portfolio page — cross-referenced against your tiers and fundamentals |
 
-### Rule 10 — Akshat Trade Signal
+### Rule 10 — Copy-Trade Signal
 
-Scrapes https://wisdomhatch.com/akshat-us-portfolio/ after every run using a headless browser (Playwright + stealth mode to bypass CleanTalk anti-bot). New trades are detected via SQLite change-tracking (`akshat_trades.db`) — only first-time-seen trades generate alerts.
+Optionally tracks buy/sell activity published on a subscription-gated portfolio page (e.g. a paid investing newsletter/influencer feed) via a headless browser. New trades are detected via local SQLite change-tracking — only first-time-seen trades generate alerts. The source URL is configured locally (never committed) in `copytrade_source.yaml` — copy from `copytrade_source.example.yaml` to enable this rule; omit it entirely if you don't use this feature.
 
 Severity logic:
 
 | Condition | Severity |
 |---|---|
-| Akshat buys something on your Tier 1/2 watchlist | HIGH |
-| Akshat sells something you currently hold | HIGH |
+| Buy on your Tier 1/2 watchlist | HIGH |
+| Sell of something you currently hold | HIGH |
 | New name (not on watchlist), fundamentals healthy | MEDIUM |
-| Akshat buys Tier 3/4 name, or fundamentals fail PE/margin gates | DIGEST |
+| Buy of a Tier 3/4 name, or fundamentals fail PE/margin gates | DIGEST |
 
-Credentials (`wisdomhatch_email`, `wisdomhatch_password`) are stored in macOS Keychain under the `portfolio-monitor` service — never in any file. Run `portfolio-monitor-bootstrap` to set or update them.
+Credentials are stored in macOS Keychain under the `portfolio-monitor` service — never in any file. Run `portfolio-monitor-bootstrap` to set or update them.
 
 ## Technical indicators
 
@@ -91,6 +105,19 @@ Detects the exact day the 50-day average crosses the 200-day average for held Ti
 All sell-side alerts include:
 - **Day % change + dollar value change** on the full position
 - **Per-lot LTCG breakdown** — long-term profitable lots sorted first, with gain per share, total gain, and days held
+
+## AI layer — Second Opinion
+
+This is the one place an LLM actually participates in the system. Every alert/digest email includes a "Second Opinion" link. Clicking it:
+
+1. Hits a local FastAPI server (`localhost:8765`, never exposed off the Mac) at `/second-opinion?symbol=...&rule=...`
+2. The server **pre-assembles all context in plain Python** before any LLM call — live price/technical snapshot, fundamentals, LTCG status from your lot records, the conviction-note comment for that ticker from `tiers.yaml`, recent alert history, recent copy-trade activity (Rule 10, if enabled), and recent headlines
+3. That context is handed to **`claude -p` running with zero tool permissions** (no Read, no Bash, no Write — it can't touch your filesystem, it only reasons over the text it's given) using a "two hats" prompt: act as both a rigorous financial analyst *and* your personal advisor who knows your tier conviction system and LTCG sensitivity
+4. The response — a short, scannable bullet list, not an essay — is saved to `second_opinions.db` and rendered as a page you can revisit later
+
+A loading page covers the ~10-15s `claude -p` latency; `/history` and `/history/{symbol}` give you a browsable journal of every past opinion, so the model never relitigates settled points — it's told what it concluded last time and builds on it.
+
+Run via `uvicorn portfolio_monitor.second_opinion.server:app --host 127.0.0.1 --port 8765` (or `portfolio-monitor-second-opinion` after `pip install -e .`), or install it as a persistent launchd daemon — `launchd/` is local-only (gitignored), so write your own plist following the same pattern as the daily-run job in the [Setup](#5-schedule-macos-launchd) section below, pointed at `uvicorn ... portfolio_monitor.second_opinion.server:app` instead.
 
 ## Tier system
 
@@ -262,6 +289,7 @@ portfolio-monitor/
 ├── tiers.yaml                  # Your tier assignments (local — copy from tiers.example.yaml)
 ├── tiers.example.yaml          # Template — populate with your own tickers
 ├── realized_pnl.yaml           # Closed position ledger (local — copy from realized_pnl.example.yaml)
+├── copytrade_source.yaml       # Rule 10 source URL (local, optional — copy from copytrade_source.example.yaml)
 ├── config.yaml                 # Thresholds + runtime config (edit freely)
 ├── docker-compose.yml          # Optional Ghostfolio stack
 ├── .env.example                # Ghostfolio secrets template
@@ -273,6 +301,8 @@ portfolio-monitor/
 │   ├── market_data.py          # yfinance: prices, ATH, MA50/200, Bollinger Bands, RSI, news
 │   ├── store.py                # SQLite cooldown + alert dedup log
 │   ├── email_dispatch.py       # Jinja2 HTML → Gmail SMTP
+│   ├── copytrade_tracker.py    # Rule 10 scraper (source URL stays in local-only config)
+│   ├── humanize.py             # Rule-name → readable label (preserves acronyms like ATH)
 │   ├── rules/
 │   │   ├── base.py             # Alert, EvaluationContext, Rule, Severity
 │   │   ├── ath_proximity.py    # Rule 0a
@@ -283,12 +313,15 @@ portfolio-monitor/
 │   │   ├── buy_the_dip.py      # Rules 5 + 6 (with quality tiers)
 │   │   ├── concentration.py    # Rule 7
 │   │   ├── earnings.py         # Rule 8
-│   │   └── ma_crossover.py     # Rule 9 — golden/death cross
+│   │   ├── ma_crossover.py     # Rule 9 — golden/death cross
+│   │   └── copytrade_signal.py # Rule 10 — copy-trade signal
+│   ├── second_opinion/         # AI layer — FastAPI server, LLM-backed alert follow-up (see below)
 │   ├── templates/
 │   │   ├── alert.html.j2       # Per-alert email (BB bar, tier badge, lot breakdown)
 │   │   └── digest.html.j2      # Weekly Saturday digest
 │   └── scripts/
 │       ├── run_guarded.py      # Time-gate + sentinel → main.run_once()
+│       ├── run_second_opinion_server.py
 │       └── broker_to_ghostfolio.py
 └── tests/                      # All offline — no network required
 ```

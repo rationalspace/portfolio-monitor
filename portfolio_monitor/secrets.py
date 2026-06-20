@@ -32,8 +32,8 @@ class SecretKey(str, Enum):
     GHOSTFOLIO_API_TOKEN = "ghostfolio_api_token"
     PUSHOVER_USER_KEY = "pushover_user_key"  # optional
     PUSHOVER_APP_TOKEN = "pushover_app_token"  # optional
-    WISDOMHATCH_EMAIL = "wisdomhatch_email"
-    WISDOMHATCH_PASSWORD = "wisdomhatch_password"
+    COPYTRADE_EMAIL = "copytrade_email"
+    COPYTRADE_PASSWORD = "copytrade_password"
 
 
 class SecretMissing(RuntimeError):

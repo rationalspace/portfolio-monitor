@@ -1,0 +1,3 @@
+# Copy to copytrade_source.yaml (local-only, gitignored) and fill in the URL
+# of the subscription-gated portfolio page you want to track.
+portfolio_url: "https://example.com/path-to-portfolio-page/"

@@ -1,8 +1,13 @@
-"""Akshat's WisdomHatch portfolio tracker.
+"""Copy-trade tracker for a subscription-gated portfolio page.
 
-Logs into wisdomhatch.com, scrapes the recent buy/sell section on
-https://wisdomhatch.com/akshat-us-portfolio/, and returns only rows that
+Logs into a login-gated page that publishes a portfolio manager's buy/sell
+activity, scrapes the recent buy/sell section, and returns only rows that
 are *new* since the last run (change-detected via a local SQLite table).
+
+The source URL — and any other identifying detail of the subscription
+service — lives in ``copytrade_source.yaml`` (local-only, gitignored) rather
+than in this file, so the service/person being tracked isn't visible in the
+public repo. Copy ``copytrade_source.example.yaml`` to get started.
 
 Credentials live in the macOS Keychain under the ``portfolio-monitor``
 service — never in code or config files.
@@ -10,7 +15,6 @@ service — never in code or config files.
 
 from __future__ import annotations
 
-import json
 import logging
 import re
 import sqlite3
@@ -18,16 +22,32 @@ from dataclasses import dataclass
 from datetime import date, datetime
 from pathlib import Path
 
+import yaml
+
 log = logging.getLogger(__name__)
 
-PORTFOLIO_URL = "https://wisdomhatch.com/akshat-us-portfolio/"
-DB_PATH = Path(__file__).resolve().parent.parent / "akshat_trades.db"
+DB_PATH = Path(__file__).resolve().parent.parent / "copytrade_trades.db"
+_SOURCE_CONFIG_PATH = Path(__file__).resolve().parent.parent / "copytrade_source.yaml"
+
+
+def _portfolio_url() -> str:
+    """Read the tracked portfolio page URL from the local-only source config."""
+    if not _SOURCE_CONFIG_PATH.exists():
+        raise FileNotFoundError(
+            f"{_SOURCE_CONFIG_PATH} not found. Copy copytrade_source.example.yaml "
+            "to copytrade_source.yaml and fill in the portfolio_url."
+        )
+    data = yaml.safe_load(_SOURCE_CONFIG_PATH.read_text()) or {}
+    url = data.get("portfolio_url")
+    if not url:
+        raise ValueError(f"{_SOURCE_CONFIG_PATH} is missing a 'portfolio_url' key.")
+    return url
 
 
 # ── Data model ───────────────────────────────────────────────────────────────
 
 @dataclass
-class AkshatTrade:
+class CopyTradeEntry:
     symbol: str
     direction: str          # "buy" or "sell"
     trade_date: str         # ISO date string as reported on the page
@@ -58,7 +78,7 @@ def _get_db(db_path: Path = DB_PATH) -> sqlite3.Connection:
     return conn
 
 
-def _filter_new(trades: list[AkshatTrade], db_path: Path = DB_PATH) -> list[AkshatTrade]:
+def _filter_new(trades: list[CopyTradeEntry], db_path: Path = DB_PATH) -> list[CopyTradeEntry]:
     """Return only trades not yet seen; persist the new ones.
 
     Dedup key is (symbol, direction, trade_date, price, quantity) — the
@@ -69,7 +89,7 @@ def _filter_new(trades: list[AkshatTrade], db_path: Path = DB_PATH) -> list[Aksh
     since older on-disk DBs may predate the corrected constraint above).
     """
     conn = _get_db(db_path)
-    new: list[AkshatTrade] = []
+    new: list[CopyTradeEntry] = []
     now = datetime.utcnow().isoformat()
     for t in trades:
         existing = conn.execute(
@@ -123,7 +143,7 @@ def _parse_date(raw: str) -> str:
     return raw.strip()
 
 
-def scrape_trades(*, headless: bool = True, dump_html: bool = False) -> list[AkshatTrade]:
+def scrape_trades(*, headless: bool = True, dump_html: bool = False) -> list[CopyTradeEntry]:
     """Log in and return all visible buy/sell trades from the portfolio page.
 
     Set ``dump_html=True`` during first-run debugging to print the raw page HTML
@@ -133,21 +153,22 @@ def scrape_trades(*, headless: bool = True, dump_html: bool = False) -> list[Aks
 
     from .secrets import SecretKey, get_secret
 
-    email = get_secret(SecretKey.WISDOMHATCH_EMAIL)
-    password = get_secret(SecretKey.WISDOMHATCH_PASSWORD)
+    portfolio_url = _portfolio_url()
+    email = get_secret(SecretKey.COPYTRADE_EMAIL)
+    password = get_secret(SecretKey.COPYTRADE_PASSWORD)
 
-    trades: list[AkshatTrade] = []
+    trades: list[CopyTradeEntry] = []
 
     with sync_playwright() as pw:
         from playwright_stealth import Stealth
         browser = pw.chromium.launch(headless=headless)
         ctx = browser.new_context()
         page = ctx.new_page()
-        Stealth().apply_stealth_sync(page)  # Mask headless fingerprint (bypasses CleanTalk)
+        Stealth().apply_stealth_sync(page)  # Mask headless fingerprint (bypasses anti-bot checks)
 
         # ── Step 1: navigate to portfolio page (login form is embedded there) ──
         log.info("Loading portfolio page (login form embedded)…")
-        page.goto(PORTFOLIO_URL, wait_until="domcontentloaded", timeout=30_000)
+        page.goto(portfolio_url, wait_until="domcontentloaded", timeout=30_000)
         log.info("Loaded: %s", page.url)
 
         if dump_html:
@@ -167,9 +188,9 @@ def scrape_trades(*, headless: bool = True, dump_html: bool = False) -> list[Aks
 
             # After login, WordPress may redirect to /wp-admin or /my-account.
             # Navigate directly to the portfolio page and verify the form is gone there.
-            if page.url != PORTFOLIO_URL and "akshat-us-portfolio" not in page.url:
+            if page.url != portfolio_url and page.url.rstrip("/") != portfolio_url.rstrip("/"):
                 log.info("Redirected to %s — navigating back to portfolio page", page.url)
-                page.goto(PORTFOLIO_URL, wait_until="domcontentloaded", timeout=30_000)
+                page.goto(portfolio_url, wait_until="domcontentloaded", timeout=30_000)
 
             # Now check if the login form is gone on the PORTFOLIO page specifically
             if page.locator('input[name="log"]').count() > 0:
@@ -204,8 +225,8 @@ def scrape_trades(*, headless: bool = True, dump_html: bool = False) -> list[Aks
     return trades
 
 
-def _extract_trades(page) -> list[AkshatTrade]:
-    """Extract trades from WisdomHatch's .notifications__box elements.
+def _extract_trades(page) -> list[CopyTradeEntry]:
+    """Extract trades from the page's ``.notifications__box`` elements.
 
     Each trade card has:
       <div class="notifications__box notifications__box--buy|sell show">
@@ -217,9 +238,9 @@ def _extract_trades(page) -> list[AkshatTrade]:
 
     Falls back to free-text scan if the DOM structure changes.
     """
-    trades: list[AkshatTrade] = []
+    trades: list[CopyTradeEntry] = []
 
-    # Primary: precise selector for WisdomHatch trade cards
+    # Primary: precise selector for the page's trade cards
     # Note: only the newest entry has class "show"; select all boxes regardless
     boxes = page.locator(".notifications__box").all()
     if boxes:
@@ -251,8 +272,8 @@ _NOTIFICATION_RE = re.compile(
 )
 
 
-def _parse_notification_box(box) -> AkshatTrade | None:
-    """Parse a single .notifications__box element into an AkshatTrade."""
+def _parse_notification_box(box) -> CopyTradeEntry | None:
+    """Parse a single .notifications__box element into a CopyTradeEntry."""
     try:
         text = box.inner_text().strip()
     except Exception:
@@ -291,7 +312,7 @@ def _parse_notification_box(box) -> AkshatTrade | None:
         price = _parse_price(m.group("price"))
         qty = _parse_qty(m.group("qty"))
 
-    return AkshatTrade(
+    return CopyTradeEntry(
         symbol=symbol,
         direction=direction,
         trade_date=trade_date,
@@ -301,8 +322,8 @@ def _parse_notification_box(box) -> AkshatTrade | None:
     )
 
 
-def _parse_table_row(headers: list[str], cells: list[str]) -> AkshatTrade | None:
-    """Map table cells to AkshatTrade using header names."""
+def _parse_table_row(headers: list[str], cells: list[str]) -> CopyTradeEntry | None:
+    """Map table cells to CopyTradeEntry using header names."""
     row: dict[str, str] = {}
     for i, h in enumerate(headers):
         if i < len(cells):
@@ -351,7 +372,7 @@ def _parse_table_row(headers: list[str], cells: list[str]) -> AkshatTrade | None
     qty = _parse_qty(row.get("qty", "") or row.get("quantity", "") or row.get("shares", "") or "")
     notes = " | ".join(f"{k}={v}" for k, v in row.items() if v)
 
-    return AkshatTrade(
+    return CopyTradeEntry(
         symbol=symbol,
         direction=direction,
         trade_date=trade_date,
@@ -378,9 +399,9 @@ _SYMBOL_DATE_RE = re.compile(
 )
 
 
-def _parse_free_text_block(text: str) -> list[AkshatTrade]:
+def _parse_free_text_block(text: str) -> list[CopyTradeEntry]:
     """Extract trades from unstructured text using regex patterns."""
-    trades: list[AkshatTrade] = []
+    trades: list[CopyTradeEntry] = []
     seen = set()
 
     for line in text.splitlines():
@@ -418,7 +439,7 @@ def _parse_free_text_block(text: str) -> list[AkshatTrade]:
             continue
         seen.add(key)
 
-        trades.append(AkshatTrade(
+        trades.append(CopyTradeEntry(
             symbol=sym,
             direction=direction,
             trade_date=_parse_date(date_raw),
@@ -433,8 +454,8 @@ def _parse_free_text_block(text: str) -> list[AkshatTrade]:
 # ── Public API ────────────────────────────────────────────────────────────────
 
 def fetch_new_trades(*, headless: bool = True, dump_html: bool = False,
-                     db_path: Path = DB_PATH) -> list[AkshatTrade]:
-    """Scrape wisdomhatch and return only trades seen for the first time.
+                     db_path: Path = DB_PATH) -> list[CopyTradeEntry]:
+    """Scrape the tracked portfolio page and return only trades seen for the first time.
 
     This is the function called by the rule engine. Returns [] if login fails,
     no trades found, or all trades were already seen in a previous run.

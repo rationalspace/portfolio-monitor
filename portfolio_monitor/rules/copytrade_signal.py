@@ -1,19 +1,20 @@
-"""Rule — Akshat's WisdomHatch trade signal.
+"""Rule — copy-trade signal from a subscription-gated portfolio tracker.
 
-Fires when a new buy or sell appears on https://wisdomhatch.com/akshat-us-portfolio/
-that is worth acting on. Alert severity is determined by:
+Fires when a new buy or sell appears on the tracked portfolio page (source
+configured in ``copytrade_source.yaml``, local-only) that is worth acting on.
+Alert severity is determined by:
 
-  HIGH   — Akshat bought something on your Tier 1/2 watchlist AND technicals confirm entry
-  HIGH   — Akshat sold something you currently hold (potential exit signal)
-  MEDIUM — Akshat bought something new (not on your watchlist) with healthy fundamentals
-  DIGEST — All other trades (Tier 3/4 watchlist, crypto, unknown ticker, sell you don't hold)
+  HIGH   — bought something on your Tier 1/2 watchlist AND technicals confirm entry
+  HIGH   — sold something you currently hold (potential exit signal)
+  MEDIUM — bought something new (not on your watchlist) with healthy fundamentals
+  DIGEST — all other trades (Tier 3/4 watchlist, crypto, unknown ticker, sell you don't hold)
 """
 
 from __future__ import annotations
 
 import logging
 
-from ..akshat_tracker import AkshatTrade, fetch_new_trades
+from ..copytrade_tracker import CopyTradeEntry, fetch_new_trades
 from ..fundamentals import is_healthy
 from ..tiers_loader import Tier
 from .base import Alert, EvaluationContext, Rule, Severity
@@ -21,12 +22,12 @@ from .base import Alert, EvaluationContext, Rule, Severity
 log = logging.getLogger(__name__)
 
 
-class AkshatTradeRule(Rule):
-    name = "akshat_trade"
+class CopyTradeSignalRule(Rule):
+    name = "copytrade_signal"
 
     @property
     def enabled(self) -> bool:
-        return self.config.akshat_trade.enabled
+        return self.config.copytrade_signal.enabled
 
     def evaluate(self, ctx: EvaluationContext) -> list[Alert]:
         if not self.enabled:
@@ -35,11 +36,11 @@ class AkshatTradeRule(Rule):
         try:
             new_trades = fetch_new_trades()
         except Exception:
-            log.exception("akshat_tracker: failed to fetch trades — skipping rule")
+            log.exception("copytrade_tracker: failed to fetch trades — skipping rule")
             return []
 
         if not new_trades:
-            log.info("akshat_trade: no new trades detected")
+            log.info("copytrade_signal: no new trades detected")
             return []
 
         held = ctx.portfolio.held_symbols()
@@ -55,7 +56,7 @@ class AkshatTradeRule(Rule):
 
     def _evaluate_trade(
         self,
-        trade: AkshatTrade,
+        trade: CopyTradeEntry,
         ctx: EvaluationContext,
         held: set[str],
         watchlist_symbols: set[str],
@@ -95,7 +96,7 @@ class AkshatTradeRule(Rule):
         # ── Severity logic ────────────────────────────────────────────────────
         if is_buy:
             if on_watchlist and tier in (Tier.TIER_1, Tier.TIER_2):
-                # Akshat buying something already on your radar — high conviction signal
+                # Bought something already on your radar — high conviction signal
                 severity = Severity.HIGH
                 context_note = f"already on your {tier_label} watchlist"
             elif fundamentals_ok:
@@ -113,7 +114,7 @@ class AkshatTradeRule(Rule):
 
         else:  # sell
             if in_portfolio:
-                # Akshat selling something you hold — potential exit signal
+                # Sold something you hold — potential exit signal
                 severity = Severity.HIGH
                 context_note = "you currently hold this — potential exit signal"
             elif on_watchlist:
@@ -139,8 +140,8 @@ class AkshatTradeRule(Rule):
             "symbol": sym,
             "direction": trade.direction,
             "trade_date": date_str,
-            "akshat_price": trade.price,
-            "akshat_qty": trade.quantity,
+            "copytrade_price": trade.price,
+            "copytrade_qty": trade.quantity,
             "current_price": price,
             "off_high_pct": off_high_pct,
             "rsi_14": rsi,
@@ -169,7 +170,7 @@ class AkshatTradeRule(Rule):
             symbol=sym,
             rule=self.name,
             severity=severity,
-            title=f"Akshat {direction_word} {sym} ({price_str} on {date_str}) — {context_note}",
+            title=f"Copy-trade {direction_word} {sym} ({price_str} on {date_str}) — {context_note}",
             body=" · ".join(body_parts),
             payload=payload,
         )

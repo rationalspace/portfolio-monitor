@@ -1,7 +1,7 @@
 """Pre-assembles all context for a Second Opinion request.
 
 Everything here is plain Python calling existing modules (``market_data``,
-``lots_loader``, ``tiers_loader``, ``store``, ``akshat_tracker``) — no new
+``lots_loader``, ``tiers_loader``, ``store``, ``copytrade_tracker``) — no new
 data pipeline, no network calls beyond what those modules already make.
 The result is a self-contained dict that ``prompt.py`` turns into text for
 ``claude -p``.
@@ -21,7 +21,7 @@ from ..market_data import MarketData
 from ..store import Store
 from ..tiers_loader import load_tiers, project_root
 
-AKSHAT_DB_PATH = Path(__file__).resolve().parent.parent.parent / "akshat_trades.db"
+COPYTRADE_DB_PATH = Path(__file__).resolve().parent.parent.parent / "copytrade_trades.db"
 
 
 @dataclass
@@ -35,7 +35,7 @@ class SecondOpinionContext:
     fundamentals: dict[str, Any] | None
     ltcg_status: str
     recent_alerts: list[dict[str, Any]]
-    recent_akshat_trades: list[dict[str, Any]]
+    recent_copytrade_activity: list[dict[str, Any]]
     recent_news: list[dict[str, Any]]
 
 
@@ -75,10 +75,10 @@ def _ltcg_status(symbol: str) -> str:
     return "; ".join(parts) if parts else "No open lots."
 
 
-def _recent_akshat_trades(symbol: str, limit: int = 5) -> list[dict[str, Any]]:
-    if not AKSHAT_DB_PATH.exists():
+def _recent_copytrade_activity(symbol: str, limit: int = 5) -> list[dict[str, Any]]:
+    if not COPYTRADE_DB_PATH.exists():
         return []
-    conn = sqlite3.connect(AKSHAT_DB_PATH)
+    conn = sqlite3.connect(COPYTRADE_DB_PATH)
     conn.row_factory = sqlite3.Row
     try:
         rows = conn.execute(
@@ -156,6 +156,6 @@ def gather_context(symbol: str, rule: str, alert_date: str | None) -> SecondOpin
         fundamentals=fundamentals,
         ltcg_status=_ltcg_status(symbol),
         recent_alerts=recent_alerts,
-        recent_akshat_trades=_recent_akshat_trades(symbol),
+        recent_copytrade_activity=_recent_copytrade_activity(symbol),
         recent_news=market.recent_news(symbol, limit=8),
     )

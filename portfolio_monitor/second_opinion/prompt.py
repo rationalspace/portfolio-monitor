@@ -78,8 +78,8 @@ def build_prompt(ctx: SecondOpinionContext, prior_entries: list[SecondOpinionRec
         f"## Fundamentals snapshot\n{json.dumps(ctx.fundamentals, indent=2)}",
         f"## Recent alert history for {ctx.symbol} (most recent first)\n"
         f"{json.dumps(ctx.recent_alerts, indent=2)}",
-        f"## Recent Akshat (WisdomHatch copy-trade) activity in {ctx.symbol}\n"
-        f"{json.dumps(ctx.recent_akshat_trades, indent=2, default=str)}",
+        f"## Recent tracked copy-trade activity in {ctx.symbol}\n"
+        f"{json.dumps(ctx.recent_copytrade_activity, indent=2, default=str)}",
         f"## Recent headlines for {ctx.symbol}\n{json.dumps(ctx.recent_news, indent=2, default=str)}",
         f"## Prior Second Opinion entries for {ctx.symbol}\n{_format_prior_entries(prior_entries)}",
     ]

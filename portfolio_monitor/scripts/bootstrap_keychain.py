@@ -26,8 +26,8 @@ PROMPTS: list[tuple[SecretKey, str, bool, bool]] = [
     (SecretKey.GHOSTFOLIO_API_TOKEN, "Ghostfolio API token (optional)", True, True),
     (SecretKey.PUSHOVER_USER_KEY, "Pushover user key (optional)", False, True),
     (SecretKey.PUSHOVER_APP_TOKEN, "Pushover app token (optional)", True, True),
-    (SecretKey.WISDOMHATCH_EMAIL, "WisdomHatch login email", False, False),
-    (SecretKey.WISDOMHATCH_PASSWORD, "WisdomHatch password", True, False),
+    (SecretKey.COPYTRADE_EMAIL, "Copy-trade source login email", False, False),
+    (SecretKey.COPYTRADE_PASSWORD, "Copy-trade source password", True, False),
 ]
 
 
