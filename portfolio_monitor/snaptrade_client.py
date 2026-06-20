@@ -17,12 +17,13 @@ from collections import defaultdict
 from datetime import date
 from typing import Any
 
+from .lots_loader import load_lots
 from .portfolio_types import Lot, Portfolio, Position
 from .secrets import SecretKey, get_secret
 
 log = logging.getLogger(__name__)
 
-# Broker positions that are cash or money-market, not equities.
+# Brokerage positions that are cash or money-market, not equities.
 # yfinance has no data for these and they should never be evaluated by rules.
 _NON_EQUITY_SYMBOLS: frozenset[str] = frozenset({
     "SPAXX",   # Government Money Market
@@ -76,11 +77,20 @@ class SnapTradeClient:
         total_value = 0.0
         cash_value = 0.0
 
+        manual_lots = load_lots()
+
         for acct in accounts:
             account_id = acct["id"]
             holdings = self._account_holdings(account_id)
             transactions = self._account_transactions(account_id)
             lots_by_symbol = _build_lots_from_transactions(transactions)
+
+            # lots.yaml wins for any symbol it covers — can't safely supplement
+            # with SnapTrade BUYs because SnapTrade history starts May 2024 and
+            # misses earlier sells, producing phantom open lots for sold shares.
+            # For symbols not in lots.yaml, SnapTrade FIFO is used as best-effort.
+            for sym, manual in manual_lots.items():
+                lots_by_symbol[sym] = manual
 
             for h in holdings.get("positions", []):
                 symbol = (h.get("symbol", {}) or {}).get("symbol", {}).get("symbol") or ""
@@ -142,34 +152,56 @@ class SnapTradeClient:
     def _account_transactions(self, account_id: str) -> list[dict[str, Any]]:
         """Fetch raw activities for an account.
 
-        Note on HTTP 410: SnapTrade gates ``get_activities`` behind a paid tier
-        for accounts created after April 25, 2026. New free-tier accounts get
-        ``410 Gone`` here. The system handles that gracefully — without
-        transactions we just don't have per-lot acquisition dates from
-        SnapTrade. Import your brokerage's transaction CSV into Ghostfolio
-        instead (see scripts/broker_to_ghostfolio.py) for accurate lot dates.
+        Uses account_information.get_account_activities (the June 2026 replacement
+        for the deprecated transactions_and_reporting.get_activities endpoint).
+        Response body is {"data": [...]} rather than a bare list.
         """
         try:
-            resp = self._client.transactions_and_reporting.get_activities(
+            resp = self._client.account_information.get_account_activities(
                 user_id=self._user_id,
                 user_secret=self._user_secret,
-                accounts=account_id,
+                account_id=account_id,
             )
-            return list(resp.body or [])
+            body = resp.body or {}
+            return list(body.get("data", []) if isinstance(body, dict) else body)
         except Exception as exc:  # noqa: BLE001
-            status = getattr(exc, "status", None) or getattr(exc, "code", None)
-            if status == 410:
-                log.info(
-                    "SnapTrade transactions endpoint unavailable for this account tier "
-                    "(HTTP 410). Holdings still synced; import Broker activity CSV "
-                    "into Ghostfolio for accurate lot dates."
-                )
-            else:
-                log.warning("Transactions fetch failed for %s: %s", account_id, exc)
+            log.warning("Transactions fetch failed for %s: %s", account_id, exc)
             return []
 
 
 # --------------------------------------------------------------------- helpers
+
+
+def _raw_buys_by_symbol(transactions: list[dict[str, Any]]) -> dict[str, list[Lot]]:
+    """Return BUY transactions as Lot objects, keyed by symbol — no FIFO processing.
+
+    Used to supplement lots.yaml with new purchases without running FIFO sell
+    logic, which produces phantom open lots when pre-May-2024 sells are absent.
+    """
+    result: dict[str, list[Lot]] = defaultdict(list)
+    for t in transactions:
+        if (t.get("type") or "").upper() != "BUY":
+            continue
+        sym_obj = t.get("symbol") or {}
+        raw = sym_obj.get("symbol")
+        symbol = (raw.get("symbol") if isinstance(raw, dict) else raw) or sym_obj.get("raw_symbol")
+        if not symbol:
+            continue
+        qty = float(t.get("units") or 0.0)
+        price = float(t.get("price") or 0.0)
+        ts = t.get("trade_date") or t.get("settlement_date")
+        try:
+            acquired = date.fromisoformat(ts[:10]) if ts else date.today()
+        except (ValueError, TypeError):
+            acquired = date.today()
+        if qty > 0:
+            result[symbol.upper()].append(Lot(
+                symbol=symbol.upper(),
+                quantity=qty,
+                cost_basis_per_share=price,
+                acquired_on=acquired,
+            ))
+    return dict(result)
 
 
 def _build_lots_from_transactions(transactions: list[dict[str, Any]]) -> dict[str, list[Lot]]:
@@ -183,7 +215,13 @@ def _build_lots_from_transactions(transactions: list[dict[str, Any]]) -> dict[st
     by_symbol: dict[str, list[dict[str, Any]]] = defaultdict(list)
     for t in transactions:
         sym_obj = t.get("symbol") or {}
-        symbol = (sym_obj.get("symbol") or {}).get("symbol") or sym_obj.get("raw_symbol")
+        # New endpoint (get_account_activities): sym_obj["symbol"] is the ticker string directly.
+        # Old endpoint (get_activities): sym_obj["symbol"] was a nested dict with its own "symbol" key.
+        raw = sym_obj.get("symbol")
+        if isinstance(raw, dict):
+            symbol = raw.get("symbol") or sym_obj.get("raw_symbol")
+        else:
+            symbol = raw or sym_obj.get("raw_symbol")
         if not symbol:
             continue
         by_symbol[symbol.upper()].append(t)
