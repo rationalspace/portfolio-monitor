@@ -16,8 +16,12 @@ below, if any).
 
 An alert just fired. Decide whether it still matters given the live data,
 what to actually do (hold/trim/add/exit), and why — referencing the
-conviction note and LTCG status where relevant. Don't relitigate points
-already settled in prior entries below; build on them or flag what changed.
+conviction note where relevant. LTCG status only affects sells/trims (it
+determines whether a sale realizes a long-term or short-term gain). If the
+recommended action is hold/add/buy, omit LTCG from the bullet list entirely —
+do not include a bullet noting that it's irrelevant; just leave it out. Don't
+relitigate points already settled in prior entries below; build on them or
+flag what changed.
 
 Go beyond the numbers — explain the business story behind them: is the
 underlying business accelerating or decelerating vs. recent quarters; what
