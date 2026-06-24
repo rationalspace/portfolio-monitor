@@ -36,7 +36,7 @@ class SecondOpinionContext:
     ltcg_status: str
     recent_alerts: list[dict[str, Any]]
     recent_copytrade_activity: list[dict[str, Any]]
-    recent_news: list[dict[str, Any]]
+    recent_news: list[str]
 
 
 def _extract_conviction_note(symbol: str, tiers_path: Path) -> str | None:
@@ -82,7 +82,8 @@ def _recent_copytrade_activity(symbol: str, limit: int = 5) -> list[dict[str, An
     conn.row_factory = sqlite3.Row
     try:
         rows = conn.execute(
-            "SELECT * FROM seen_trades WHERE symbol = ? ORDER BY trade_date DESC LIMIT ?",
+            "SELECT direction, trade_date, price, quantity FROM seen_trades "
+            "WHERE symbol = ? ORDER BY trade_date DESC LIMIT ?",
             (symbol.upper(), limit),
         ).fetchall()
         return [dict(r) for r in rows]
@@ -144,7 +145,7 @@ def gather_context(symbol: str, rule: str, alert_date: str | None) -> SecondOpin
         }
         for a in store.recent(limit=200)
         if a.symbol == symbol
-    ][:5]
+    ][:3]
 
     return SecondOpinionContext(
         symbol=symbol,
@@ -157,5 +158,5 @@ def gather_context(symbol: str, rule: str, alert_date: str | None) -> SecondOpin
         ltcg_status=_ltcg_status(symbol),
         recent_alerts=recent_alerts,
         recent_copytrade_activity=_recent_copytrade_activity(symbol),
-        recent_news=market.recent_news(symbol, limit=8),
+        recent_news=[n["title"] for n in market.recent_news(symbol, limit=6) if n.get("title")],
     )
