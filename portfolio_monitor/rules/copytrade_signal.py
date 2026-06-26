@@ -143,6 +143,8 @@ class CopyTradeSignalRule(Rule):
             "copytrade_price": trade.price,
             "copytrade_qty": trade.quantity,
             "current_price": price,
+            "price": price,
+            "fifty_two_week_high": high,
             "off_high_pct": off_high_pct,
             "rsi_14": rsi,
             "forward_pe": fund.forward_pe if fund else None,

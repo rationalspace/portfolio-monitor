@@ -13,9 +13,12 @@ from __future__ import annotations
 
 import logging
 import socket
+import time
 from collections import defaultdict
 from datetime import date
-from typing import Any
+from typing import Any, Callable, TypeVar
+
+T = TypeVar("T")
 
 from .lots_loader import load_lots
 from .portfolio_types import Lot, Portfolio, Position
@@ -63,6 +66,15 @@ class SnapTradeClient:
         # but urllib3 respects socket.getdefaulttimeout() — this prevents the
         # process from hanging forever if SnapTrade's server stops responding.
         socket.setdefaulttimeout(90.0)
+
+        # The SDK signs each request (PartnerTimestamp/PartnerSignature) once,
+        # before handing it to urllib3 — its default Retry(total=3) then
+        # resends that *same* stale-signed request on a connection stall
+        # instead of re-signing, which SnapTrade's server rejects with a 401
+        # "Invalid timestamp" once enough time has passed. Disable the SDK's
+        # blind retry here; _with_retry() below does our own retry, which
+        # calls the SDK method fresh each attempt so the signature is current.
+        self._client.account_information.api_client.configuration.retries = 0
 
     # ------------------------------------------------------------------ public
 
@@ -134,18 +146,47 @@ class SnapTradeClient:
 
     # --------------------------------------------------------------- internals
 
+    @staticmethod
+    def _with_retry(call: Callable[[], T], *, attempts: int = 3) -> T:
+        """Retries ``call`` from scratch on failure (not urllib3's blind resend).
+
+        Each retry re-invokes ``call``, so the SDK re-signs a fresh
+        PartnerTimestamp/PartnerSignature rather than resending a request
+        whose signature may have gone stale during a stalled connection.
+        """
+        last_exc: Exception | None = None
+        for attempt in range(1, attempts + 1):
+            try:
+                return call()
+            except Exception as exc:  # noqa: BLE001
+                last_exc = exc
+                if attempt < attempts:
+                    log.warning(
+                        "SnapTrade call failed (attempt %d/%d): %s — retrying",
+                        attempt,
+                        attempts,
+                        exc,
+                    )
+                    time.sleep(1.5 * attempt)
+        assert last_exc is not None
+        raise last_exc
+
     def _list_accounts(self) -> list[dict[str, Any]]:
-        resp = self._client.account_information.list_user_accounts(
-            user_id=self._user_id,
-            user_secret=self._user_secret,
+        resp = self._with_retry(
+            lambda: self._client.account_information.list_user_accounts(
+                user_id=self._user_id,
+                user_secret=self._user_secret,
+            )
         )
         return list(resp.body or [])
 
     def _account_holdings(self, account_id: str) -> dict[str, Any]:
-        resp = self._client.account_information.get_user_holdings(
-            user_id=self._user_id,
-            user_secret=self._user_secret,
-            account_id=account_id,
+        resp = self._with_retry(
+            lambda: self._client.account_information.get_user_holdings(
+                user_id=self._user_id,
+                user_secret=self._user_secret,
+                account_id=account_id,
+            )
         )
         return dict(resp.body or {})
 
@@ -157,10 +198,12 @@ class SnapTradeClient:
         Response body is {"data": [...]} rather than a bare list.
         """
         try:
-            resp = self._client.account_information.get_account_activities(
-                user_id=self._user_id,
-                user_secret=self._user_secret,
-                account_id=account_id,
+            resp = self._with_retry(
+                lambda: self._client.account_information.get_account_activities(
+                    user_id=self._user_id,
+                    user_secret=self._user_secret,
+                    account_id=account_id,
+                )
             )
             body = resp.body or {}
             return list(body.get("data", []) if isinstance(body, dict) else body)
