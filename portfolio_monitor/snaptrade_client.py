@@ -12,11 +12,12 @@ SnapTrade brokerage connection is read-only anyway), additional methods can be a
 from __future__ import annotations
 
 import logging
-import socket
 import time
 from collections import defaultdict
 from datetime import date
 from typing import Any, Callable, TypeVar
+
+import urllib3
 
 T = TypeVar("T")
 
@@ -61,11 +62,35 @@ class SnapTradeClient:
         self._user_id = get_secret(SecretKey.SNAPTRADE_USER_ID)
         self._user_secret = get_secret(SecretKey.SNAPTRADE_USER_SECRET)
 
-        # Apply a 90-second socket timeout globally for this process.
-        # The SnapTrade SDK's public API methods don't expose a per-call timeout,
-        # but urllib3 respects socket.getdefaulttimeout() — this prevents the
-        # process from hanging forever if SnapTrade's server stops responding.
-        socket.setdefaulttimeout(90.0)
+        # The SDK's rest.py always explicitly passes timeout=<whatever the
+        # generated method gave it> straight through to
+        # pool_manager.request(...) — and since the generated methods never
+        # supply one, that's always an *explicit* `timeout=None`. urllib3
+        # treats an explicit None as "block forever" and it overrides any
+        # pool-level default (setting connection_pool_kw["timeout"] alone is
+        # not enough — confirmed by testing against a non-routable IP).
+        # socket.setdefaulttimeout() doesn't help either, since urllib3
+        # manages its own per-connection timeouts.
+        #
+        # Confirmed in production 2026-06-26: a stalled connection blocked the
+        # daily run for 20+ minutes with no timeout ever firing, and the hard
+        # SIGALRM safety net in run_guarded.py couldn't interrupt it either
+        # (signals aren't delivered mid-blocking-syscall in a C extension).
+        #
+        # Fix: monkeypatch the bound pool_manager.request method to inject a
+        # real timeout whenever the SDK passes timeout=None. Verified against
+        # a non-routable IP: without this patch the call hangs indefinitely;
+        # with it, the call fails within ~65s (3 attempts x ~10s connect
+        # timeout + retry backoff) instead of hanging forever.
+        pool_manager = self._client.account_information.api_client.rest_client.pool_manager
+        _original_pm_request = pool_manager.request
+
+        def _pm_request_with_timeout(method: str, url: str, *args: Any, **kwargs: Any) -> Any:
+            if kwargs.get("timeout") is None:
+                kwargs["timeout"] = urllib3.Timeout(connect=10, read=60)
+            return _original_pm_request(method, url, *args, **kwargs)
+
+        pool_manager.request = _pm_request_with_timeout
 
         # The SDK signs each request (PartnerTimestamp/PartnerSignature) once,
         # before handing it to urllib3 — its default Retry(total=3) then
