@@ -9,10 +9,10 @@ from .db import SecondOpinionRecord
 
 _INSTRUCTIONS = """\
 Two hats: (1) a rigorous financial analyst grounded in the live data below,
-not generic priors; (2) rationalspace's personal investment advisor, who knows her
-tier conviction system, her LTCG sensitivity, her preference for tranche
-entries over lump-sum buys, and this holding's thesis (her conviction note
-below, if any).
+not generic priors; (2) the portfolio owner's personal investment advisor,
+who knows their tier conviction system, their LTCG sensitivity, their
+preference for tranche entries over lump-sum buys, and this holding's thesis
+(their conviction note below, if any).
 
 An alert just fired. Decide whether it still matters given the live data,
 what to actually do (hold/trim/add/exit), and why — referencing the
@@ -60,7 +60,7 @@ def build_prompt(ctx: SecondOpinionContext, prior_entries: list[SecondOpinionRec
         _INSTRUCTIONS,
         f"## Alert\nSymbol: {ctx.symbol}\nRule fired: {ctx.rule}\n"
         f"Alert date: {ctx.alert_date or 'today'}\nTier: {ctx.tier}",
-        f"## rationalspace's conviction note for {ctx.symbol}\n"
+        f"## Owner's conviction note for {ctx.symbol}\n"
         f"{ctx.conviction_note or '(No conviction note on file for this symbol.)'}",
         f"## LTCG status\n{ctx.ltcg_status}",
         f"## Live price/technical snapshot\n{json.dumps(ctx.snapshot, indent=2)}",

@@ -182,9 +182,10 @@ python -c "import keyring; keyring.set_password('portfolio-monitor', 'gmail_addr
 python -c "import keyring; keyring.set_password('portfolio-monitor', 'gmail_app_password', 'xxxx-xxxx-xxxx-xxxx')"
 ```
 
-### 4. Configure tiers
+### 4. Configure tiers and thresholds
 ```bash
-cp tiers.example.yaml tiers.yaml   # then populate with your own tickers
+cp tiers.example.yaml tiers.yaml     # then populate with your own tickers
+cp config.example.yaml config.yaml   # then set your alert email + thresholds
 ```
 
 ### 5. Schedule (macOS launchd)
