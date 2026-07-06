@@ -19,10 +19,10 @@ from __future__ import annotations
 
 import logging
 import math
-from datetime import date, timedelta
 
 from ..tiers_loader import Tier
 from .base import Alert, EvaluationContext, Rule, Severity
+from .lot_utils import lot_analysis
 
 log = logging.getLogger(__name__)
 
@@ -33,35 +33,6 @@ _TIER_MAP = {
     "tier_4": Tier.TIER_4,
     "exit_pool": Tier.EXIT_POOL,
 }
-
-_LTCG_DAYS = 365
-
-
-def _lot_rows(positions: list, price: float) -> list[dict]:
-    cutoff = date.today() - timedelta(days=_LTCG_DAYS)
-    rows = []
-    for pos in positions:
-        for lot in pos.lots:
-            days_held = (date.today() - lot.acquired_on).days
-            is_lt = lot.acquired_on <= cutoff
-            cost = lot.cost_basis_per_share
-            gain_per_share = price - cost
-            gain_pct = gain_per_share / cost if cost else 0.0
-            gain_total = gain_per_share * lot.quantity
-            rows.append({
-                "acquired_on": lot.acquired_on.isoformat(),
-                "days_held": days_held,
-                "quantity": lot.quantity,
-                "cost_per_share": cost,
-                "gain_per_share": gain_per_share,
-                "gain_pct": gain_pct,
-                "gain_total": gain_total,
-                "is_long_term": is_lt,
-                "is_profitable": gain_per_share > 0,
-            })
-    rows.sort(key=lambda r: (not r["is_long_term"], not r["is_profitable"], r["acquired_on"]))
-    return rows
-
 
 class AthProximityRule(Rule):
     name = "ath_proximity"
@@ -120,7 +91,12 @@ class AthProximityRule(Rule):
             unrealized_pl_pct = unrealized_pl / cost_total if cost_total else 0.0
 
             # Lot breakdown
-            lots = _lot_rows(positions, snap.price)
+            lots = lot_analysis(
+                positions,
+                snap.price,
+                lt_rate=self.config.tax_rates.lt_rate,
+                st_rate=self.config.tax_rates.st_rate,
+            )
             lt_profitable = [l for l in lots if l["is_long_term"] and l["is_profitable"]]
 
             # If long_term_only, skip when no qualifying lots

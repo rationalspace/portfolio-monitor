@@ -3,15 +3,21 @@
 from __future__ import annotations
 
 from datetime import date, timedelta
+from pathlib import Path
 from unittest.mock import MagicMock, patch
 
 import pandas as pd
 import pytest
+from jinja2 import Environment, FileSystemLoader, select_autoescape
+
+from portfolio_monitor.humanize import humanize_rule_name
+
+TEMPLATE_DIR = Path(__file__).parent.parent / "portfolio_monitor" / "templates"
 
 from portfolio_monitor.market_data import PriceSnapshot
 from portfolio_monitor.portfolio_types import Lot, Portfolio, Position
 from portfolio_monitor.rules.ath_proximity import AthProximityRule
-from portfolio_monitor.tiers_loader import AthProximityConfig, Tier
+from portfolio_monitor.tiers_loader import AthProximityConfig, TaxRatesConfig, Tier
 
 
 # ------------------------------------------------------------------ helpers
@@ -25,6 +31,7 @@ def _config(threshold=0.85, lt_only=True, tiers=None, min_history=365):
         apply_to_tiers=tiers or ["tier_1", "tier_2"],
         min_history_days=min_history,
     )
+    cfg.tax_rates = TaxRatesConfig()
     return cfg
 
 
@@ -202,3 +209,42 @@ class TestAthProximityRule:
         p = alerts[0].payload
         assert p["lt_profitable_qty"] == pytest.approx(200)
         assert p["lt_profitable_gain"] == pytest.approx((147.0 - 29.72) * 200)
+
+    def test_lot_payload_has_tax_fields(self):
+        """Regression for 2026-07-06: the alert template renders lot.est_tax,
+        lot.tax_rate, lot.lt_eligible_on and lot.days_to_lt for every lot, but
+        the rule's private lot builder omitted them — every ATH alert email
+        failed with 'unsupported format string passed to Undefined.__format__'
+        and was silently dropped (6 alerts lost that day)."""
+        snap = _snap(price=147.0)
+        lots = [
+            _lot(200, 29.72, 500),   # LT profitable
+            _lot(50, 130.0, 100),    # ST profitable
+        ]
+        ctx = _ctx(snap, [_position(lots)], ath=163.0)
+        alerts = AthProximityRule(_config()).evaluate(ctx)
+        for row in alerts[0].payload["lots"]:
+            for key in ("est_tax", "tax_rate", "lt_eligible_on", "days_to_lt"):
+                assert key in row, f"lot row missing {key}"
+
+    def test_alert_renders_in_email_template_without_error(self):
+        """Render the real alert.html.j2 with a live-built payload (LT + ST
+        lots) — the exact path that failed in production on 2026-07-06."""
+        snap = _snap(price=147.0)
+        lots = [
+            _lot(200, 29.72, 500),   # LT profitable → renders LT tax line
+            _lot(100, 160.0, 400),   # LT underwater
+            _lot(50, 130.0, 100),    # ST profitable → renders ST tax line
+        ]
+        ctx = _ctx(snap, [_position(lots)], ath=163.0)
+        alerts = AthProximityRule(_config()).evaluate(ctx)
+        assert len(alerts) == 1
+
+        env = Environment(
+            loader=FileSystemLoader(TEMPLATE_DIR),
+            autoescape=select_autoescape(["html"]),
+        )
+        env.filters["humanize_rule"] = humanize_rule_name
+        template = env.get_template("alert.html.j2")
+        html = template.render(alert=alerts[0], severity=alerts[0].severity.value)
+        assert "DOCN" in html
