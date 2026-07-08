@@ -2,12 +2,20 @@
 
 Fires when a new buy or sell appears on the tracked portfolio page (source
 configured in ``copytrade_source.yaml``, local-only) that is worth acting on.
-Alert severity is determined by:
 
-  HIGH   — bought something on your Tier 1/2 watchlist AND technicals confirm entry
+BUY severity requires THREE aligned signals (2026-07-08 — the source alone is
+one vote, not a verdict; a source buy at RSI 70 after a 24% bounce is his
+risk appetite, not your entry):
+
+  HIGH   — on your tier 1/2 or watchlist AND source bought AND technicals
+           confirm entry (RSI ≤ buy_max_rsi, ≥ buy_min_off_high_pct below 52w high)
+  DIGEST — source bought but tier membership or technicals missing (informational)
+
+SELL severity is unchanged — the asymmetry is deliberate (exits protect you):
+
   HIGH   — sold something you currently hold (potential exit signal)
-  MEDIUM — bought something new (not on your watchlist) with healthy fundamentals
-  DIGEST — all other trades (Tier 3/4 watchlist, crypto, unknown ticker, sell you don't hold)
+  MEDIUM — sold something on your watchlist
+  DIGEST — everything else
 """
 
 from __future__ import annotations
@@ -94,21 +102,46 @@ class CopyTradeSignalRule(Rule):
         tier_label = tier.value.replace("_", " ").title() if tier else "Uncategorized"
 
         # ── Severity logic ────────────────────────────────────────────────────
+        cfg = self.config.copytrade_signal
         if is_buy:
-            if on_watchlist and tier in (Tier.TIER_1, Tier.TIER_2):
-                # Bought something already on your radar — high conviction signal
+            on_radar = on_watchlist or tier in (Tier.TIER_1, Tier.TIER_2)
+
+            # Technical entry gate: the source buying is one vote, not a verdict.
+            # Confirm the price is an actual entry (pulled back, not overbought)
+            # before interrupting the user with an actionable alert.
+            technicals_confirm = True
+            technical_notes: list[str] = []
+            if cfg.buy_technical_gate:
+                if rsi is not None and rsi > cfg.buy_max_rsi:
+                    technicals_confirm = False
+                    technical_notes.append(f"RSI {rsi:.0f} > {cfg.buy_max_rsi:.0f} (bounce-chasing)")
+                if off_high_pct is not None and off_high_pct > -cfg.buy_min_off_high_pct:
+                    technicals_confirm = False
+                    technical_notes.append(
+                        f"only {-off_high_pct:.0%} off 52w high (need ≥{cfg.buy_min_off_high_pct:.0%})"
+                    )
+
+            if cfg.buy_requires_tier_membership and not on_radar:
+                severity = Severity.DIGEST
+                context_note = "not on your tiers/watchlist — informational only"
+            elif not technicals_confirm:
+                severity = Severity.DIGEST
+                context_note = (
+                    f"on your {tier_label} radar but technicals don't confirm entry: "
+                    + "; ".join(technical_notes)
+                )
+            elif on_radar:
+                # Your conviction + source's buy + technical confirmation all align
                 severity = Severity.HIGH
-                context_note = f"already on your {tier_label} watchlist"
+                context_note = f"on your {tier_label} radar AND technicals confirm entry"
             elif fundamentals_ok:
-                # New idea, fundamentals pass — worth a look
+                # (only reachable when buy_requires_tier_membership=False)
                 severity = Severity.MEDIUM
                 context_note = "new position (not on your watchlist); fundamentals healthy"
             elif fundamentals_ok is False:
-                # Fundamentals failed — flag but as digest, let you decide
                 severity = Severity.DIGEST
                 context_note = f"fundamentals concern: {'; '.join(failing_reasons[:2])}"
             else:
-                # No fundamentals data (new/small-cap)
                 severity = Severity.MEDIUM
                 context_note = "no fundamentals data available — do your own check"
 

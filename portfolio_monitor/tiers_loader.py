@@ -43,6 +43,13 @@ class PerTickerOverride(BaseModel):
     top_up_off_high_threshold: float | None = None  # Override tier default; e.g. 0.90 = alert at 10% off high
 
 
+class ThemeBucket(BaseModel):
+    """A named basket of correlated symbols with a portfolio-weight cap."""
+
+    cap: float                                    # e.g. 0.45 = alert when basket > 45% of portfolio
+    symbols: list[str] = Field(default_factory=list)
+
+
 class TierMap(BaseModel):
     """Loaded ``tiers.yaml``.
 
@@ -60,6 +67,7 @@ class TierMap(BaseModel):
     watchlist: list[WatchlistEntry] = Field(default_factory=list)
     index_fund: list[str] = Field(default_factory=list)
     overrides: dict[str, PerTickerOverride] = Field(default_factory=dict)
+    themes: dict[str, ThemeBucket] = Field(default_factory=dict)
 
     def tier_for(self, symbol: str) -> Tier:
         """Return the tier of a held ticker, or UNCATEGORIZED if it isn't placed."""
@@ -147,6 +155,11 @@ class AthProximityConfig(BaseModel):
     min_history_days: int = 365         # Require at least 1yr of price history
 
 
+class ThemeConcentrationConfig(BaseModel):
+    enabled: bool = True
+    cooldown_days: int = 7              # One reminder a week is enough for a slow-moving number
+
+
 class ExitWatchlistConfig(BaseModel):
     enabled: bool = True
     day_pop_pct: float = 0.03          # Fire on any 3%+ single-day move
@@ -216,6 +229,14 @@ class CopyTradeConfig(BaseModel):
     enabled: bool = True
     # 1-day cooldown: re-alert if the same trade appears again (shouldn't normally happen)
     cooldown_days: int = 1
+    # BUY signals only escalate above DIGEST when ALL THREE align:
+    # (1) symbol is on your tier 1/2 or watchlist, (2) source bought it,
+    # (3) technicals confirm a real entry (not chasing a bounce).
+    # SELL signals are unaffected — "source sold what you hold" stays HIGH.
+    buy_requires_tier_membership: bool = True
+    buy_technical_gate: bool = True
+    buy_max_rsi: float = 60.0            # Skip if RSI above this — bounce-chasing, not an entry
+    buy_min_off_high_pct: float = 0.10   # Require price ≥10% below 52w high
 
 
 class SchedulerConfig(BaseModel):
@@ -245,6 +266,7 @@ class AppConfig(BaseModel):
     tax_rates: TaxRatesConfig = Field(default_factory=TaxRatesConfig)
     sell_into_strength: SellIntoStrengthConfig = Field(default_factory=SellIntoStrengthConfig)
     ath_proximity: AthProximityConfig = Field(default_factory=AthProximityConfig)
+    theme_concentration: ThemeConcentrationConfig = Field(default_factory=ThemeConcentrationConfig)
     exit_watchlist: ExitWatchlistConfig = Field(default_factory=ExitWatchlistConfig)
     capitulation: CapitulationConfig = Field(default_factory=CapitulationConfig)
     tier_3_weakness: TierWeaknessConfig
