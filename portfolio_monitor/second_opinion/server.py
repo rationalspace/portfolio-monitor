@@ -18,7 +18,7 @@ from fastapi import FastAPI, HTTPException, Query
 from fastapi.responses import HTMLResponse, JSONResponse
 from jinja2 import Environment, FileSystemLoader, select_autoescape
 
-from ..humanize import humanize_rule_name
+from ..humanize import humanize_rule_name, signed_dollar
 from .claude_runner import ClaudeRunError, run_claude
 from .context import gather_context
 from .db import SecondOpinionStore
@@ -36,6 +36,7 @@ _env = Environment(
     lstrip_blocks=True,
 )
 _env.filters["humanize_rule"] = humanize_rule_name
+_env.filters["signed_dollar"] = signed_dollar
 _store = SecondOpinionStore()
 
 
