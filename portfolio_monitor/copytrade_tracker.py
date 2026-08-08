@@ -290,7 +290,13 @@ def _parse_notification_box(box) -> CopyTradeEntry | None:
     raw_date = lines[1]
     description = " ".join(lines[2:])
 
-    if not symbol or len(symbol) < 2:
+    # Line 0 is deterministically the ticker (its own line in the notification
+    # box markup, not extracted via ambiguous regex) — unlike the free-text
+    # fallback parser, there's no false-positive risk here, so single-letter
+    # tickers (V, F, T, X, C, ...) are valid and must not be dropped. This bug
+    # was silently discarding every Visa (V) trade as "UNDEFINED" — found
+    # 2026-08-08 while cross-referencing Akshat's sells against held symbols.
+    if not symbol:
         return None
 
     trade_date = _parse_date(raw_date)
