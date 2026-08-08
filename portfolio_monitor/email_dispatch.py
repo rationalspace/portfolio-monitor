@@ -44,7 +44,8 @@ class EmailDispatcher:
     # ------------------------------------------------------------------ public
 
     def send_alert(self, alert: Alert, *, dry_run: bool = False) -> None:
-        template = self.env.get_template("alert.html.j2")
+        template_name = "theme_concentration.html.j2" if alert.rule == "theme_concentration" else "alert.html.j2"
+        template = self.env.get_template(template_name)
         html = template.render(alert=alert, severity=alert.severity.value)
         subject = f"[{alert.severity.value.upper()}] {alert.title}"
         self._send(subject=subject, html=html, dry_run=dry_run)

@@ -12,17 +12,30 @@ Themes and their caps live in ``tiers.yaml``::
         symbols: [GOOGL, NVDA, ...]
 
 Fires one alert per theme (pseudo-symbol = theme name) when the basket's
-combined weight exceeds its cap. Payload carries the per-symbol breakdown
-sorted by weight so the alert doubles as a trim shortlist.
+combined weight exceeds its cap. Payload carries a per-symbol breakdown —
+weight, gain%, % of ATH, RSI — sorted by weight, with a ``trim_candidate``
+flag on names that are both a meaningful weight AND currently near their
+high with elevated momentum. That combination (not weight alone) is what
+makes a name a genuine "sell into strength" candidate rather than just a
+large position sitting quietly mid-range.
 """
 
 from __future__ import annotations
 
 import logging
+import math
 
 from .base import Alert, EvaluationContext, Rule, Severity
 
 log = logging.getLogger(__name__)
+
+# A basket member is flagged as a trim candidate when it's near its ATH
+# (genuine strength to sell into, not selling a retreat) AND either
+# meaningfully overbought or just a large enough position that timing
+# matters less than the concentration itself.
+_TRIM_ATH_THRESHOLD = 0.85
+_TRIM_RSI_THRESHOLD = 65.0
+_TRIM_MIN_WEIGHT = 0.05  # 5%+ of portfolio — large enough that sizing matters on its own
 
 
 class ThemeConcentrationRule(Rule):
@@ -59,8 +72,42 @@ class ThemeConcentrationRule(Rule):
                 continue
 
             over_value = (theme_pct - bucket.cap) * total
-            breakdown = sorted(weights.items(), key=lambda kv: -kv[1])
-            top = ", ".join(f"{s} {w:.1%}" for s, w in breakdown[:5])
+            breakdown_rows = []
+            for symbol, weight in sorted(weights.items(), key=lambda kv: -kv[1]):
+                positions = ctx.portfolio.by_symbol(symbol)
+                mv = sum(p.market_value for p in positions)
+                cost = sum(p.average_cost * p.quantity for p in positions)
+                gain_pct = (mv - cost) / cost if cost else None
+
+                snap = ctx.market.snapshot(symbol)
+                ath_pct = rsi = None
+                if snap is not None and not math.isnan(snap.price):
+                    ath = ctx.market.ath(symbol)
+                    if ath:
+                        ath_pct = snap.price / ath
+                    rsi = ctx.market.rsi_14(symbol)
+
+                trim_candidate = (
+                    (ath_pct is not None and ath_pct >= _TRIM_ATH_THRESHOLD)
+                    and (
+                        (rsi is not None and rsi >= _TRIM_RSI_THRESHOLD)
+                        or weight >= _TRIM_MIN_WEIGHT
+                    )
+                )
+
+                breakdown_rows.append({
+                    "symbol": symbol,
+                    "weight": weight,
+                    "market_value": mv,
+                    "gain_pct": gain_pct,
+                    "ath_pct": ath_pct,
+                    "rsi": rsi,
+                    "trim_candidate": trim_candidate,
+                })
+
+            trim_symbols = [r["symbol"] for r in breakdown_rows if r["trim_candidate"]]
+            top = ", ".join(f"{s} {w:.1%}" for s, w in sorted(weights.items(), key=lambda kv: -kv[1])[:5])
+            trim_note = f" Trim candidates (near ATH + strength): {', '.join(trim_symbols)}." if trim_symbols else ""
 
             alerts.append(Alert(
                 symbol=theme_name.upper(),
@@ -73,7 +120,7 @@ class ThemeConcentrationRule(Rule):
                 body=(
                     f"Basket of {len(members)} holdings totals {theme_pct:.1%} "
                     f"(${theme_pct * total:,.0f}) vs cap {bucket.cap:.0%}. "
-                    f"~${over_value:,.0f} above target. Largest: {top}."
+                    f"~${over_value:,.0f} above target. Largest: {top}.{trim_note}"
                 ),
                 payload={
                     "theme": theme_name,
@@ -81,13 +128,11 @@ class ThemeConcentrationRule(Rule):
                     "cap": bucket.cap,
                     "over_value": over_value,
                     "total_portfolio_value": total,
-                    "breakdown": [
-                        {"symbol": s, "weight": w, "market_value": w * total}
-                        for s, w in breakdown
-                    ],
+                    "breakdown": breakdown_rows,
+                    "trim_symbols": trim_symbols,
                 },
             ))
-            log.info("THEME ALERT %s: %.1f%% of portfolio vs %.0f%% cap (~$%.0f over)",
-                     theme_name.upper(), theme_pct * 100, bucket.cap * 100, over_value)
+            log.info("THEME ALERT %s: %.1f%% of portfolio vs %.0f%% cap (~$%.0f over) — trim candidates: %s",
+                     theme_name.upper(), theme_pct * 100, bucket.cap * 100, over_value, trim_symbols or "none")
 
         return alerts

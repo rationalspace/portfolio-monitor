@@ -10,7 +10,7 @@ import pandas as pd
 import pytest
 from jinja2 import Environment, FileSystemLoader, select_autoescape
 
-from portfolio_monitor.humanize import humanize_rule_name
+from portfolio_monitor.humanize import humanize_rule_name, signed_dollar
 
 TEMPLATE_DIR = Path(__file__).parent.parent / "portfolio_monitor" / "templates"
 
@@ -245,6 +245,7 @@ class TestAthProximityRule:
             autoescape=select_autoescape(["html"]),
         )
         env.filters["humanize_rule"] = humanize_rule_name
+        env.filters["signed_dollar"] = signed_dollar
         template = env.get_template("alert.html.j2")
         html = template.render(alert=alerts[0], severity=alerts[0].severity.value)
         assert "DOCN" in html

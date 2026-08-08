@@ -11,7 +11,7 @@ from unittest.mock import MagicMock, patch
 from jinja2 import Environment, FileSystemLoader
 
 from portfolio_monitor.copytrade_tracker import CopyTradeEntry
-from portfolio_monitor.humanize import humanize_rule_name
+from portfolio_monitor.humanize import humanize_rule_name, signed_dollar
 from portfolio_monitor.market_data import FundamentalsSnapshot, PriceSnapshot
 from portfolio_monitor.rules.copytrade_signal import CopyTradeSignalRule
 from portfolio_monitor.tiers_loader import BuyTheDipConfig, CopyTradeConfig, Tier
@@ -132,6 +132,7 @@ class TestCopyTradeSignalRule:
 
         env = Environment(loader=FileSystemLoader(str(TEMPLATE_DIR)))
         env.filters["humanize_rule"] = humanize_rule_name
+        env.filters["signed_dollar"] = signed_dollar
         template = env.get_template("alert.html.j2")
         html = template.render(alert=alert, severity=alert.severity.value)
         assert "GOOGL" in html

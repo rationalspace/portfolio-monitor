@@ -43,8 +43,9 @@ def test_tier_lookups_for_known_owner_picks():
     assert tiers.tier_for("GOOGL") == Tier.TIER_1
     assert tiers.tier_for("NFLX") == Tier.TIER_2    # promoted from Tier 3
     assert tiers.tier_for("DOCN") == Tier.TIER_2      # moved from exit_pool to tier_2 — long-term AI infra hold
-    assert tiers.tier_for("PYPL") == Tier.EXIT_POOL
-    assert tiers.tier_for("ADBE") == Tier.EXIT_POOL
+    assert tiers.tier_for("AMD") == Tier.TIER_1       # re-added 2026-07-07 — other account's LT lots remain
+    assert tiers.tier_for("TSM") == Tier.TIER_1       # initiated 2026-07-31
+    # PYPL, ADBE, PATH fully sold 2026-07-09 (loss harvest) — no longer in exit_pool
     # V, NOW removed from exit_pool; S, UBER fully sold — no longer in tiers
     assert tiers.tier_for("COIN") == Tier.CRYPTO_EXPOSURE
     assert tiers.tier_for("FBTC") == Tier.CRYPTO_EXPOSURE

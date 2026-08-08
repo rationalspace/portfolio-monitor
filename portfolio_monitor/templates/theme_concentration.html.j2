@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{{ alert.title }}</title>
+</head>
+<body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #f7f7f7; margin: 0; padding: 20px;">
+  <div style="max-width: 640px; margin: 0 auto; background: #fff; border-radius: 8px; padding: 24px; box-shadow: 0 2px 8px rgba(0,0,0,.06);">
+
+    <div style="display: inline-block; padding: 4px 10px; border-radius: 4px; color: #fff; font-size: 12px; font-weight: 600; background: #d68910;">
+      MEDIUM
+    </div>
+    <span style="margin-left: 8px; font-size: 12px; color: #888;">Theme Concentration</span>
+
+    {% set p = alert.payload %}
+    <h1 style="margin: 12px 0 4px; font-size: 22px; color: #2c3e50;">{{ p.theme | upper }} theme — {{ "{:.1%}".format(p.theme_pct) }} of portfolio</h1>
+    <p style="margin: 0 0 16px; color: #555;">
+      {{ "{:.0%}".format(p.cap) }} cap · {{ p.breakdown | length }} holdings ·
+      <span style="color:#c0392b; font-weight:600;">~{{ p.over_value | signed_dollar }} over target</span>
+    </p>
+
+    {% if p.trim_symbols %}
+    <div style="background:#fff8e6; border:1px solid #f0d68a; border-radius:6px; padding:12px 14px; margin-bottom:18px;">
+      <strong style="color:#8a6300; font-size:13px;">Trim candidates this run:</strong>
+      <span style="color:#555; font-size:13px;">{{ p.trim_symbols | join(', ') }}</span>
+      <div style="color:#888; font-size:11px; margin-top:4px;">Near ATH (≥85%) with either elevated RSI or a large enough position that sizing matters on its own — the combination that makes "sell into strength" actionable, not just weight alone.</div>
+    </div>
+    {% endif %}
+
+    <table style="width: 100%; border-collapse: collapse; font-size: 13px;">
+      <thead>
+        <tr style="background:#f9f9f9;">
+          <th style="padding: 6px 8px; text-align: left; color:#888; border-bottom: 2px solid #eee;">Symbol</th>
+          <th style="padding: 6px 8px; text-align: right; color:#888; border-bottom: 2px solid #eee;">Weight</th>
+          <th style="padding: 6px 8px; text-align: right; color:#888; border-bottom: 2px solid #eee;">Value</th>
+          <th style="padding: 6px 8px; text-align: right; color:#888; border-bottom: 2px solid #eee;">Gain</th>
+          <th style="padding: 6px 8px; text-align: right; color:#888; border-bottom: 2px solid #eee;">% ATH</th>
+          <th style="padding: 6px 8px; text-align: right; color:#888; border-bottom: 2px solid #eee;">RSI</th>
+          <th style="padding: 6px 8px; text-align: center; color:#888; border-bottom: 2px solid #eee;"></th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for row in p.breakdown %}
+        <tr style="border-bottom: 1px solid #f2f2f2; {% if row.trim_candidate %}background:#fffdf4;{% endif %}">
+          <td style="padding: 7px 8px; font-weight: 700; color: #2c3e50;">{{ row.symbol }}</td>
+          <td style="padding: 7px 8px; text-align: right;">{{ "{:.1%}".format(row.weight) }}</td>
+          <td style="padding: 7px 8px; text-align: right;">${{ "{:,.0f}".format(row.market_value) }}</td>
+          <td style="padding: 7px 8px; text-align: right; color: {% if row.gain_pct is not none and row.gain_pct < 0 %}#c0392b{% else %}#27ae60{% endif %};">
+            {% if row.gain_pct is not none %}{{ "{:+.0%}".format(row.gain_pct) }}{% else %}—{% endif %}
+          </td>
+          <td style="padding: 7px 8px; text-align: right; {% if row.ath_pct is not none and row.ath_pct >= 0.85 %}font-weight:700;{% endif %}">
+            {% if row.ath_pct is not none %}{{ "{:.0%}".format(row.ath_pct) }}{% else %}—{% endif %}
+          </td>
+          <td style="padding: 7px 8px; text-align: right; {% if row.rsi is not none and row.rsi >= 65 %}color:#c0392b; font-weight:700;{% endif %}">
+            {% if row.rsi is not none %}{{ "{:.0f}".format(row.rsi) }}{% else %}—{% endif %}
+          </td>
+          <td style="padding: 7px 8px; text-align: center;">
+            {% if row.trim_candidate %}<span title="Trim candidate">🔥</span>{% endif %}
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+
+    <p style="font-size: 11px; color: #aaa; margin-top: 16px;">
+      Weekly reminder while the theme stays over cap. Trim-candidate flag = ≥85% of ATH AND (RSI ≥ 65 OR position ≥ 5% of portfolio) — genuine strength to sell into, not a rule to blindly follow.
+    </p>
+  </div>
+</body>
+</html>
