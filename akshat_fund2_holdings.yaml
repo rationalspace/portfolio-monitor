@@ -1,0 +1,44 @@
+# akshat_fund2_holdings.yaml — Snapshot of a SECOND, distinct Akshat Shrivastava
+# portfolio (owner-pasted 2026-08-13). Confirmed distinct from Fund 1
+# (akshat_fund1_holdings.yaml) — overlapping names (NVDA, META, MSFT, etc.) have
+# different share counts and cost bases, so this is a separate account, not a
+# refresh of Fund 1.
+#
+# Same caveat as Fund 1: point-in-time snapshot, no live scraper for full
+# holdings — re-paste periodically to refresh.
+#
+# Fields: symbol, description, quantity, avg_cost, last_price, cost_basis,
+#         market_value, return_pct, weight_pct, day_change_pct
+
+snapshot_date: "2026-08-13"
+
+holdings:
+  - {symbol: MU,    description: "Micron Technology Inc",              quantity: 27.81,  avg_cost: 684.66,  last_price: 911.29,  cost_basis: 19042.26, market_value: 25345.43, return_pct: 33.10,  weight_pct: 3.87,  day_change_pct: 4.92}
+  - {symbol: V,     description: "Visa Inc",                           quantity: 25.69,  avg_cost: 303.54,  last_price: 359.42,  cost_basis: 7798.73,  market_value: 9234.35,  return_pct: 18.41,  weight_pct: 1.41,  day_change_pct: -0.94}
+  - {symbol: MA,    description: "Mastercard Inc",                     quantity: 42.78,  avg_cost: 496.07,  last_price: 559.73,  cost_basis: 21224.59, market_value: 23948.21, return_pct: 12.83,  weight_pct: 3.66,  day_change_pct: -0.30}
+  - {symbol: AXON,  description: "Axon Enterprise Inc",                quantity: 35.80,  avg_cost: 383.60,  last_price: 599.78,  cost_basis: 13735.04, market_value: 21475.07, return_pct: 56.36,  weight_pct: 3.28,  day_change_pct: -5.74}
+  - {symbol: HOOD,  description: "Robinhood Markets Inc",              quantity: 74.66,  avg_cost: 75.30,   last_price: 94.91,   cost_basis: 5623.07,  market_value: 7086.61,  return_pct: 26.04,  weight_pct: 1.08,  day_change_pct: 0.56}
+  - {symbol: NVDA,  description: "NVIDIA Corp",                        quantity: 240.59, avg_cost: 188.56,  last_price: 224.09,  cost_basis: 45369.46, market_value: 53915.81, return_pct: 18.84,  weight_pct: 8.24,  day_change_pct: 3.03}
+  - {symbol: UAE,   description: "iShares MSCI UAE ETF",                quantity: 329.34, avg_cost: 18.21,   last_price: 19.64,   cost_basis: 6000.00,  market_value: 6468.32,  return_pct: 7.85,   weight_pct: 0.98,  day_change_pct: 0.98}
+  - {symbol: GOOG,  description: "Alphabet Inc Class C",                quantity: 64.02,  avg_cost: 320.06,  last_price: 342.37,  cost_basis: 20493.11, market_value: 21920.99, return_pct: 6.97,   weight_pct: 3.35,  day_change_pct: -0.18}
+  - {symbol: GOOGL, description: "Alphabet Inc Class A",                quantity: 23.00,  avg_cost: 350.91,  last_price: 343.54,  cost_basis: 8071.02,  market_value: 7901.42,  return_pct: -2.10,  weight_pct: 1.20,  day_change_pct: -0.08}
+  - {symbol: AMZN,  description: "Amazon.com Inc",                     quantity: 133.46, avg_cost: 231.24,  last_price: 267.28,  cost_basis: 30863.94, market_value: 35672.97, return_pct: 15.59,  weight_pct: 5.45,  day_change_pct: -1.83}
+  - {symbol: IAUM,  description: "iShares Gold Trust Micro",            quantity: 334.50, avg_cost: 45.10,   last_price: 44.00,   cost_basis: 15089.52, market_value: 14718.36, return_pct: -2.44,  weight_pct: 2.25,  day_change_pct: 0.99}
+  - {symbol: MSFT,  description: "Microsoft Corp",                     quantity: 101.94, avg_cost: 390.17,  last_price: 492.43,  cost_basis: 39777.76, market_value: 50201.88, return_pct: 26.21,  weight_pct: 7.68,  day_change_pct: -2.26}
+  - {symbol: SPGI,  description: "S&P Global Inc",                     quantity: 57.33,  avg_cost: 413.70,  last_price: 410.10,  cost_basis: 23719.07, market_value: 23512.41, return_pct: -0.87,  weight_pct: 3.59,  day_change_pct: 0.37}
+  - {symbol: LLY,   description: "Eli Lilly And Co",                   quantity: 14.66,  avg_cost: 990.34,  last_price: 1220.28, cost_basis: 14524.87, market_value: 17897.11, return_pct: 23.22,  weight_pct: 2.73,  day_change_pct: 0.43}
+  - {symbol: ISRG,  description: "Intuitive Surgical Inc",              quantity: 44.00,  avg_cost: 417.54,  last_price: 401.27,  cost_basis: 18371.92, market_value: 17655.88, return_pct: -3.90,  weight_pct: 2.70,  day_change_pct: 0.01}
+  - {symbol: PANW,  description: "Palo Alto Networks Inc",              quantity: 55.00,  avg_cost: 166.42,  last_price: 387.01,  cost_basis: 9153.21,  market_value: 21285.55, return_pct: 132.55, weight_pct: 3.25,  day_change_pct: 0.84}
+  - {symbol: NOW,   description: "ServiceNow Inc",                     quantity: 354.91, avg_cost: 93.70,   last_price: 124.94,  cost_basis: 33258.30, market_value: 44342.63, return_pct: 33.34,  weight_pct: 6.78,  day_change_pct: -2.04}
+  - {symbol: CRWD,  description: "Crowdstrike Holdings Inc",            quantity: 61.20,  avg_cost: 102.33,  last_price: 221.78,  cost_basis: 6262.88,  market_value: 13572.93, return_pct: 116.73, weight_pct: 2.07,  day_change_pct: -0.05}
+  - {symbol: MELI,  description: "MercadoLibre Inc",                   quantity: 14.00,  avg_cost: 1754.31, last_price: 1828.29, cost_basis: 24560.38, market_value: 25596.06, return_pct: 4.22,   weight_pct: 3.91,  day_change_pct: -5.76}
+  - {symbol: NFLX,  description: "Netflix Inc",                        quantity: 554.99, avg_cost: 76.91,   last_price: 74.21,   cost_basis: 42689.86, market_value: 41186.54, return_pct: -3.51,  weight_pct: 6.30,  day_change_pct: -0.78}
+  - {symbol: VEEV,  description: "Veeva Systems Inc",                  quantity: 144.49, avg_cost: 163.36,  last_price: 241.51,  cost_basis: 23606.23, market_value: 34898.19, return_pct: 47.84,  weight_pct: 5.33,  day_change_pct: 2.08}
+  - {symbol: IREN,  description: "IREN Ltd",                           quantity: 133.33, avg_cost: 63.29,   last_price: 43.67,   cost_basis: 8439.59,  market_value: 5822.66,  return_pct: -31.00, weight_pct: 0.89,  day_change_pct: 9.86}
+  - {symbol: TEM,   description: "Tempus AI Inc",                      quantity: 33.33,  avg_cost: 46.82,   last_price: 54.61,   cost_basis: 1560.67,  market_value: 1820.33,  return_pct: 16.64,  weight_pct: 0.27,  day_change_pct: -1.94}
+  - {symbol: AVGO,  description: "Broadcom Inc",                       quantity: 22.00,  avg_cost: 404.12,  last_price: 416.05,  cost_basis: 8890.68,  market_value: 9153.10,  return_pct: 2.95,   weight_pct: 1.40,  day_change_pct: -0.01}
+  - {symbol: PLTR,  description: "Palantir Technologies Inc",           quantity: 86.80,  avg_cost: 120.49,  last_price: 171.04,  cost_basis: 10458.56, market_value: 14846.27, return_pct: 41.95,  weight_pct: 2.27,  day_change_pct: -2.23}
+  - {symbol: RKLB,  description: "Rocket Lab Corp",                    quantity: 92.00,  avg_cost: 71.89,   last_price: 81.17,   cost_basis: 6613.91,  market_value: 7467.64,  return_pct: 12.91,  weight_pct: 1.14,  day_change_pct: 1.45}
+  - {symbol: NBIS,  description: "Nebius Group NV",                    quantity: 40.00,  avg_cost: 187.62,  last_price: 259.20,  cost_basis: 7505.00,  market_value: 10368.00, return_pct: 38.15,  weight_pct: 1.58,  day_change_pct: 34.14}
+  - {symbol: TSM,   description: "Taiwan Semiconductor Mnfg Co Ltd",    quantity: 27.33,  avg_cost: 392.35,  last_price: 429.15,  cost_basis: 10724.41, market_value: 11730.09, return_pct: 9.38,   weight_pct: 1.79,  day_change_pct: 1.68}
+  - {symbol: META,  description: "Meta Platforms Inc",                 quantity: 128.87, avg_cost: 559.50,  last_price: 578.85,  cost_basis: 72104.63, market_value: 74598.02, return_pct: 3.46,   weight_pct: 11.41, day_change_pct: -3.38}

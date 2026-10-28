@@ -1,15 +1,23 @@
-"""Idempotent daily runner — safe to call multiple times.
+"""Idempotent twice-daily runner — safe to call multiple times.
 
-launchd fires this every 30 minutes between 16:30 and 20:00 ET on weekdays.
-The script exits immediately if:
+launchd fires this every 30 minutes in two windows on weekdays:
+  - 12:30–16:00 ET  → the "midday" slot (intraday check — catches floor breaks
+    and rally windows while the market is still open to act on them)
+  - 16:30–20:00 ET  → the "close" slot (the original after-close run)
+
+Each slot runs the full monitor at most once per day. The script exits
+immediately if:
   - today is a weekend
-  - it's before 16:15 ET (safety margin around market close)
-  - the monitor already ran successfully today
+  - the current time falls outside both slot windows
+  - the current slot already ran successfully today
 
-On the first firing after 16:15 where no run has happened yet, it executes the
-full portfolio monitor run and records a sentinel file so later firings skip it.
+Alert de-duplication between the two runs is handled by the existing per
+(symbol, rule) cooldown gate, so a midday alert suppresses its close-run twin.
 
-Sentinel location: ~/.portfolio-monitor-last-run  (contains YYYY-MM-DD)
+Sentinel location: ~/.portfolio-monitor-last-run
+Format: one ``YYYY-MM-DD slot`` line per completed run (up to two lines kept).
+A legacy bare ``YYYY-MM-DD`` line (pre-slot format) counts as that day's close
+run so upgrading never causes a double close-run on day one.
 """
 
 from __future__ import annotations
@@ -17,7 +25,7 @@ from __future__ import annotations
 import logging
 import signal
 import sys
-from datetime import date, datetime, timezone
+from datetime import date, datetime
 from pathlib import Path
 from zoneinfo import ZoneInfo
 
@@ -29,22 +37,49 @@ log = logging.getLogger(__name__)
 
 ET = ZoneInfo("America/New_York")
 SENTINEL = Path.home() / ".portfolio-monitor-last-run"
-MARKET_CLOSE_HOUR = 16
-MARKET_CLOSE_MINUTE = 15  # slight buffer before the 4:30 scheduled time
+
+# Slot windows (ET). Each slot opens slightly before its first launchd firing
+# so a catch-up firing after wake still lands in the right slot.
+MIDDAY_OPEN = (12, 15)   # midday slot: 12:15 <= t < 16:15
+CLOSE_OPEN = (16, 15)    # close slot:  t >= 16:15 (buffer before 16:30 firing)
 
 
-def already_ran_today() -> bool:
+def current_slot(now: datetime) -> str | None:
+    """Which run-slot does *now* fall into? ``None`` = outside both windows."""
+    hm = (now.hour, now.minute)
+    if hm >= CLOSE_OPEN:
+        return "close"
+    if hm >= MIDDAY_OPEN:
+        return "midday"
+    return None
+
+
+def _completed_slots_today() -> set[str]:
     if not SENTINEL.exists():
-        return False
+        return set()
+    today = date.today().isoformat()
+    slots: set[str] = set()
     try:
-        return SENTINEL.read_text().strip() == date.today().isoformat()
+        for line in SENTINEL.read_text().splitlines():
+            parts = line.strip().split()
+            if not parts or parts[0] != today:
+                continue
+            # Legacy format: bare date with no slot = the old once-daily close run.
+            slots.add(parts[1] if len(parts) > 1 else "close")
     except OSError:
-        return False
+        return set()
+    return slots
 
 
-def mark_ran_today() -> None:
+def already_ran_today(slot: str) -> bool:
+    return slot in _completed_slots_today()
+
+
+def mark_ran_today(slot: str) -> None:
+    today = date.today().isoformat()
+    slots = _completed_slots_today() | {slot}
     try:
-        SENTINEL.write_text(date.today().isoformat())
+        SENTINEL.write_text("".join(f"{today} {s}\n" for s in sorted(slots)))
     except OSError as exc:
         log.warning("Could not write sentinel file: %s", exc)
 
@@ -62,17 +97,16 @@ def main() -> int:
         log.info("Weekend — skipping.")
         return 0
 
-    # Skip if before market close buffer.
-    if (now_et.hour, now_et.minute) < (MARKET_CLOSE_HOUR, MARKET_CLOSE_MINUTE):
-        log.info("Before market close (%02d:%02d ET) — skipping.", now_et.hour, now_et.minute)
+    slot = current_slot(now_et)
+    if slot is None:
+        log.info("Outside run windows (%02d:%02d ET) — skipping.", now_et.hour, now_et.minute)
         return 0
 
-    # Skip if already ran today.
-    if already_ran_today():
-        log.info("Already ran today (%s) — skipping.", date.today().isoformat())
+    if already_ran_today(slot):
+        log.info("Slot '%s' already ran today (%s) — skipping.", slot, date.today().isoformat())
         return 0
 
-    log.info("Conditions met — starting portfolio monitor run.")
+    log.info("Conditions met — starting portfolio monitor run (slot: %s).", slot)
 
     # Hard timeout: if the run hangs (e.g. a SnapTrade or yfinance request that
     # never returns), SIGALRM fires after _RUN_TIMEOUT_SECONDS and raises
@@ -89,8 +123,8 @@ def main() -> int:
     try:
         run_once()
         signal.alarm(0)  # cancel the alarm on success
-        mark_ran_today()
-        log.info("Run completed and sentinel written.")
+        mark_ran_today(slot)
+        log.info("Run completed and sentinel written (slot: %s).", slot)
     except TimeoutError as exc:
         log.error("TIMEOUT: %s — sentinel NOT written (will retry next slot).", exc)
         return 1

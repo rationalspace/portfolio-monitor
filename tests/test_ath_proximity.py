@@ -123,9 +123,25 @@ class TestAthProximityRule:
         alerts = rule.evaluate(ctx)
         assert len(alerts) == 1
 
-    def test_skips_short_term_lots_when_lt_only(self):
+    def test_fires_short_term_lots_but_labels_them(self):
+        # Changed 2026-10-27 (risk-over-tax standing instruction): ST-only
+        # profitable lots now fire, clearly labeled, instead of being skipped —
+        # waiting for LTCG is a manual decision, not something that should
+        # silently suppress the alert.
         snap = _snap(price=147.0)
         lots = [_lot(100, 29.72, 100)]   # profitable but short-term
+        ctx = _ctx(snap, [_position(lots)], ath=163.0)
+        rule = AthProximityRule(_config(lt_only=True))
+        alerts = rule.evaluate(ctx)
+        assert len(alerts) == 1
+        assert "[SHORT-TERM ONLY]" in alerts[0].title
+        assert alerts[0].payload["st_only"] is True
+        assert alerts[0].payload["has_lt_profitable_lots"] is False
+
+    def test_skips_when_no_profitable_lots_at_all(self):
+        # The one remaining skip condition: not even an ST profitable lot.
+        snap = _snap(price=147.0)
+        lots = [_lot(100, 200.0, 100)]   # underwater, short-term
         ctx = _ctx(snap, [_position(lots)], ath=163.0)
         rule = AthProximityRule(_config(lt_only=True))
         alerts = rule.evaluate(ctx)

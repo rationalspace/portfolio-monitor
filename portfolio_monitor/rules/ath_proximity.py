@@ -20,6 +20,7 @@ from __future__ import annotations
 import logging
 import math
 
+from ..humanize import signed_dollar
 from ..tiers_loader import Tier
 from .base import Alert, EvaluationContext, Rule, Severity
 from .lot_utils import lot_analysis
@@ -98,30 +99,47 @@ class AthProximityRule(Rule):
                 st_rate=self.config.tax_rates.st_rate,
             )
             lt_profitable = [l for l in lots if l["is_long_term"] and l["is_profitable"]]
+            st_profitable = [l for l in lots if not l["is_long_term"] and l["is_profitable"]]
 
-            # If long_term_only, skip when no qualifying lots
-            if cfg.long_term_only and not lt_profitable:
-                log.debug("%s: no long-term profitable lots — skipping", symbol)
+            # cfg.long_term_only now means "require SOME profitable lot" (LT or ST) rather
+            # than gating on LT specifically — risk reduction takes priority over waiting
+            # for LTCG; the alert just labels ST-only cases clearly so the LT-vs-now call
+            # stays a manual, informed decision rather than the alert silently never firing.
+            # (standing instruction 2026-10-27, see feedback_tax_optimization_vs_risk_management.md)
+            if cfg.long_term_only and not lt_profitable and not st_profitable:
+                log.debug("%s: no profitable lots (LT or ST) — skipping", symbol)
                 continue
 
             lt_qty = sum(l["quantity"] for l in lt_profitable)
             lt_gain = sum(l["gain_total"] for l in lt_profitable)
+            st_qty = sum(l["quantity"] for l in st_profitable)
+            st_gain = sum(l["gain_total"] for l in st_profitable)
+            st_only = bool(st_profitable) and not lt_profitable
 
             fifty_two_week_high = ctx.market.fifty_two_week_high(symbol)
             gap_to_ath = ath - snap.price
             tier_label = ctx.tiers.tier_for(symbol).value
 
-            lt_note = f" · {lt_qty:.0f} LT shares gain ${lt_gain:+,.0f}" if lt_profitable else ""
+            lt_note = f" · {lt_qty:.0f} LT shares gain {signed_dollar(lt_gain)}" if lt_profitable else ""
+            st_flag = " [SHORT-TERM ONLY]" if st_only else ""
             title = (
-                f"{symbol} at {ath_pct:.0%} of ATH — consider trimming{lt_note}"
+                f"{symbol} at {ath_pct:.0%} of ATH — consider trimming{st_flag}{lt_note}"
             )
             body = (
                 f"Price ${snap.price:,.2f} is {ath_pct:.0%} of ATH ${ath:,.2f} "
                 f"(${gap_to_ath:,.2f} away). "
-                f"Unrealized gain: {unrealized_pl_pct:+.1%} (${unrealized_pl:+,.0f})."
+                f"Unrealized gain: {unrealized_pl_pct:+.1%} ({signed_dollar(unrealized_pl)})."
             )
             if lt_profitable:
                 body += f" {len(lt_profitable)} long-term profitable lot(s) available — LTCG eligible."
+            if st_only:
+                body += (
+                    f" All profitable lots are still SHORT-TERM ({st_qty:.0f} sh, gain "
+                    f"{signed_dollar(st_gain)}) — selling now means the ST rate, not LTCG. "
+                    f"Manual call: trim now for risk reduction, or wait for LT status."
+                )
+            elif st_profitable:
+                body += f" Plus {st_qty:.0f} ST profitable share(s) (gain {signed_dollar(st_gain)})."
 
             payload = {
                 "symbol": symbol,
@@ -142,6 +160,10 @@ class AthProximityRule(Rule):
                 "lt_profitable_qty": lt_qty,
                 "lt_profitable_gain": lt_gain,
                 "has_lt_profitable_lots": bool(lt_profitable),
+                "st_profitable_qty": st_qty,
+                "st_profitable_gain": st_gain,
+                "has_st_profitable_lots": bool(st_profitable),
+                "st_only": st_only,
             }
 
             alerts.append(Alert(
@@ -154,8 +176,9 @@ class AthProximityRule(Rule):
             ))
 
             log.info(
-                "ATH ALERT %s: %.1f%% of ATH $%.2f | LT profitable: %d lot(s)",
+                "ATH ALERT %s: %.1f%% of ATH $%.2f | LT profitable: %d lot(s)%s",
                 symbol, ath_pct * 100, ath, len(lt_profitable),
+                f" | ST-only ({len(st_profitable)} lot(s))" if st_only else "",
             )
 
         return alerts

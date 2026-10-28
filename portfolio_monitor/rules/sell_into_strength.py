@@ -41,6 +41,7 @@ class SellIntoStrengthRule(Rule):
         for symbol in sorted(eligible_symbols):
             override = ctx.tiers.override_for(symbol)
             pop_threshold = override.sell_into_strength_pop_threshold or cfg.single_day_pop_pct
+            rally_threshold = override.sell_into_strength_rally_threshold or cfg.five_day_rally_pct
 
             snap = ctx.market.snapshot(symbol)
             if snap is None:
@@ -55,7 +56,7 @@ class SellIntoStrengthRule(Rule):
                 )
 
             # Trigger B — 5-day rally.
-            if snap.five_day_return_pct >= cfg.five_day_rally_pct:
+            if snap.five_day_return_pct >= rally_threshold:
                 triggers.append(f"5-day rally {snap.five_day_return_pct:+.1%}")
 
             # Trigger C — earnings gap-up.
@@ -135,6 +136,9 @@ class SellIntoStrengthRule(Rule):
             }
             title = f"{symbol} {snap.day_return_pct:+.1%} — possible exit window"
             body = "; ".join(triggers)
+            if override.action_note:
+                body += f". Standing note: {override.action_note}"
+                payload["action_note"] = override.action_note
             alerts.append(
                 Alert(
                     symbol=symbol,

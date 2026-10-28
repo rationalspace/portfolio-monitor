@@ -20,6 +20,7 @@ from __future__ import annotations
 import logging
 from datetime import date, timedelta
 
+from ..humanize import signed_dollar
 from ..tiers_loader import Tier
 from .base import Alert, EvaluationContext, Rule, Severity
 from .lot_utils import lot_analysis as _lot_analysis, lot_tax_summary as _lot_tax_summary
@@ -146,7 +147,7 @@ class ExitWatchlistRule(Rule):
             lt_gain_total = tax["lt_gross"]
             lt_note = ""
             if tax["has_lt_profitable_lots"]:
-                lt_note = f" · {lt_qty:.0f} LT profitable shares (${lt_gain_total:+,.0f})"
+                lt_note = f" · {lt_qty:.0f} LT profitable shares ({signed_dollar(lt_gain_total)})"
 
             title = f"{symbol} {snap.day_return_pct:+.1%} — {action_word} window{lt_note}"
             body = "; ".join(triggers)

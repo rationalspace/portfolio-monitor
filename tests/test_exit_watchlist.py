@@ -172,7 +172,7 @@ class TestExitWatchlistRule:
         rule = ExitWatchlistRule(_config())
         alerts = rule.evaluate(ctx)
         assert "100 LT profitable shares" in alerts[0].title
-        assert "$+1,000" in alerts[0].title
+        assert "+$1,000" in alerts[0].title
 
     def test_skips_non_exit_pool(self):
         snap = _snap(day=0.10)

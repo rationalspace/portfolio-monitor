@@ -308,6 +308,21 @@ class TopUpCompounderRule(Rule):
                 + (f" · {' · '.join(body_parts)}" if body_parts else "")
             )
 
+            # Cross-reference the ladder cycle: a SCREAMING_BUY on a name that's also
+            # in an over-cap theme basket is the expected rebuy half of the trim-then-
+            # rebuy cycle, not an unrelated signal — flag it so it reads as "the ladder
+            # is working," not a second, disconnected alert. (2026-10-28)
+            ladder_themes = [
+                theme_name for theme_name, bucket in ctx.tiers.themes.items()
+                if symbol in {s.upper() for s in bucket.symbols}
+            ]
+            if tier_code == "SCREAMING_BUY" and ladder_themes:
+                theme_list = ", ".join(t.upper() for t in ladder_themes)
+                body += (
+                    f" · Ladder rebuy candidate — {symbol} is in the {theme_list} theme basket; "
+                    "if you trimmed this on strength earlier, this looks like the rebuy leg of that cycle."
+                )
+
             payload = {
                 "symbol": symbol,
                 "tier": tier.value,

@@ -16,6 +16,7 @@ from .earnings import EarningsHeadsUpRule
 from .ath_proximity import AthProximityRule
 from .exit_watchlist import ExitWatchlistRule
 from .ma_crossover import MaCrossoverRule
+from .price_floor import PriceFloorRule
 from .sell_into_strength import SellIntoStrengthRule
 from .tier_weakness import Tier3WeaknessRule, Tier4WeaknessRule
 from .copytrade_signal import CopyTradeSignalRule
@@ -25,6 +26,7 @@ ALL_RULES: list[type[Rule]] = [
     AthProximityRule,
     ExitWatchlistRule,
     SellIntoStrengthRule,
+    PriceFloorRule,
     CapitulationRule,
     Tier3WeaknessRule,
     Tier4WeaknessRule,
@@ -54,6 +56,7 @@ __all__ = [
     "ConcentrationDriftRule",
     "EarningsHeadsUpRule",
     "MaCrossoverRule",
+    "PriceFloorRule",
     "CopyTradeSignalRule",
     "ThemeConcentrationRule",
 ]
