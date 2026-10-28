@@ -92,14 +92,16 @@ def run_once(*, dry_run: bool = False, send_digest: bool = False) -> int:
             rule_specific_days = getattr(rule_specific, "cooldown_days", None) if rule_specific else None
             cooldown_days = per_ticker or rule_specific_days or config.alerts.cooldown_days
             if store.in_cooldown(alert.symbol, alert.rule, cooldown_days):
+                last_rec = store.last_alert(alert.symbol, alert.rule)
+                rule_cfg = getattr(config, alert.rule, None)
+                bypassed = False
+
                 # Dip-bypass: if the stock has fallen meaningfully further since
                 # the last alert, override the cooldown so the user can average down.
                 # Only applies to rules that carry an off_high_pct in the payload.
                 current_dip = alert.payload.get("off_high_pct")
-                if current_dip is not None:
-                    last_rec = store.last_alert(alert.symbol, alert.rule)
-                    last_dip = last_rec.payload.get("off_high_pct") if last_rec else None
-                    rule_cfg = getattr(config, alert.rule, None)
+                if current_dip is not None and last_rec is not None:
+                    last_dip = last_rec.payload.get("off_high_pct")
                     bypass_pct = getattr(rule_cfg, "dip_bypass_pct", 0.02)
                     if last_dip is not None and (current_dip - last_dip) < -bypass_pct:
                         log.info(
@@ -107,10 +109,26 @@ def run_once(*, dry_run: bool = False, send_digest: bool = False) -> int:
                             alert.symbol, alert.rule,
                             last_dip * 100, current_dip * 100, bypass_pct * 100,
                         )
-                    else:
-                        log.debug("Cooldown skip: %s/%s", alert.symbol, alert.rule)
-                        continue
-                else:
+                        bypassed = True
+
+                # Rally-bypass: if a strength rally has extended meaningfully
+                # further since the last alert, override the cooldown so a
+                # continuing rally keeps alerting instead of going silent for
+                # the full cooldown window. Only applies to rules that carry a
+                # five_day_return_pct in the payload (e.g. sell_into_strength).
+                current_rally = alert.payload.get("five_day_return_pct")
+                if not bypassed and current_rally is not None and last_rec is not None:
+                    last_rally = last_rec.payload.get("five_day_return_pct")
+                    rally_bypass_pct = getattr(rule_cfg, "rally_bypass_pct", 0.05)
+                    if last_rally is not None and (current_rally - last_rally) > rally_bypass_pct:
+                        log.info(
+                            "Cooldown bypass %s/%s: rally extended %.1f%% → %.1f%% (>%.0f pp further)",
+                            alert.symbol, alert.rule,
+                            last_rally * 100, current_rally * 100, rally_bypass_pct * 100,
+                        )
+                        bypassed = True
+
+                if not bypassed:
                     log.debug("Cooldown skip: %s/%s", alert.symbol, alert.rule)
                     continue
 

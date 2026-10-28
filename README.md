@@ -146,10 +146,12 @@ overrides:
 
 ## Scheduling & catch-up
 
-- **launchd** fires every 30 min from 4:30–8:00 PM ET, Mon–Fri
-- **Catch-up**: if the Mac was asleep at 4:30, the next wake fires immediately
-- **Sentinel file** (`~/.portfolio-monitor-last-run`) ensures exactly one run per calendar day
-- **7-day cooldown** per (symbol, rule) pair — MA Crossover uses 30-day cooldown
+- **launchd** fires every 30 min in two windows, Mon–Fri:
+  - **Midday slot**: 12:30–4:00 PM ET — intraday check so floor breaks and rally windows are caught while the market is still open to act on them
+  - **Close slot**: 4:30–8:00 PM ET — the original after-close run
+- **Catch-up**: if the Mac was asleep at a slot's start, the next wake fires immediately
+- **Sentinel file** (`~/.portfolio-monitor-last-run`) ensures exactly one run per slot per calendar day (one `YYYY-MM-DD slot` line per completed run; legacy bare-date lines count as that day's close run)
+- **7-day cooldown** per (symbol, rule) pair — MA Crossover uses 30-day cooldown; the cooldown also de-dupes alerts between the midday and close runs
 
 ## Setup
 

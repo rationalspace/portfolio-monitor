@@ -40,7 +40,15 @@ class PerTickerOverride(BaseModel):
     concentration_exempt: bool = False
     alert_cooldown_days: int | None = None
     sell_into_strength_pop_threshold: float | None = None
+    sell_into_strength_rally_threshold: float | None = None  # Override global five_day_rally_pct; e.g. 0.10 = alert on 10% 5-day rally
     top_up_off_high_threshold: float | None = None  # Override tier default; e.g. 0.90 = alert at 10% off high
+    price_floor: float | None = None  # Hard exit level — PriceFloorRule fires HIGH when close breaks below
+    action_note: str | None = None  # Owner's standing instruction, echoed verbatim in every alert for this ticker
+    moat_risk_score: float | None = None  # 0-10, curated by hand: 0 = durable/structural moat (switching
+    # costs, regulatory lock-in, irreplaceable relationships), 10 = speculative/narrative-dependent with
+    # no real competitive barrier. None = not yet assessed (theme_concentration treats as neutral/unknown,
+    # NOT as safe). Feeds the bubble-exposure score alongside ATH proximity, analyst upside, and FCF trend —
+    # this is the one dimension that can't be computed from market data and has to be a deliberate judgment.
 
 
 class ThemeBucket(BaseModel):
@@ -145,12 +153,16 @@ class SellIntoStrengthConfig(BaseModel):
     five_day_rally_pct: float = 0.15
     earnings_gap_up_pct: float = 0.05
     catalyst_news_required: bool = False
+    rally_bypass_pct: float = 0.02   # Bypass 7-day cooldown if 5-day rally extends ≥2pp further (matches dip_bypass_pct convention)
 
 
 class AthProximityConfig(BaseModel):
     enabled: bool = True
     ath_threshold_pct: float = 0.85     # Fire when price >= 85% of ATH
-    long_term_only: bool = True         # Only alert if there are LT lots (>365d)
+    long_term_only: bool = True         # Only alert if there are profitable lots at all (LT or
+    # ST — despite the name, this no longer gates on LT specifically as of 2026-10-27; ST-only
+    # cases still fire, just clearly labeled [SHORT-TERM ONLY] so the LT-vs-now tax call stays
+    # manual rather than the alert silently never firing. Kept the field name for config compat.
     apply_to_tiers: list[str] = Field(default_factory=lambda: ["tier_1", "tier_2"])
     min_history_days: int = 365         # Require at least 1yr of price history
 

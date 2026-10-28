@@ -37,6 +37,70 @@ _TRIM_ATH_THRESHOLD = 0.85
 _TRIM_RSI_THRESHOLD = 65.0
 _TRIM_MIN_WEIGHT = 0.05  # 5%+ of portfolio — large enough that sizing matters on its own
 
+# ── Bubble-exposure score (added 2026-10-28) ──────────────────────────────────
+# Four 0-10 dimensions, summed to a 0-40 composite. Higher = more worth trimming
+# on bubble-protection grounds specifically (separate from the trim_candidate
+# flag above, which is a pure "sell into strength" technical signal). See
+# project_pltr_moat_vs_valuation.md for the worked example that motivated this —
+# PLTR scores high on ATH+valuation but the moat dimension is a deliberate,
+# researched override (2.5, i.e. durable), not an assumption.
+
+
+def _ath_score(ath_pct: float | None) -> float:
+    if ath_pct is None:
+        return 0.0
+    if ath_pct >= 0.95:
+        return 10.0
+    if ath_pct >= 0.90:
+        return 8.0
+    if ath_pct >= 0.85:
+        return 6.0
+    if ath_pct >= 0.80:
+        return 4.0
+    if ath_pct >= 0.70:
+        return 2.0
+    return 0.0
+
+
+def _valuation_score(upside_pct: float | None) -> float:
+    # upside_pct: analyst mean target vs current price, e.g. 0.05 = +5%
+    if upside_pct is None:
+        return 5.0  # unknown — neutral, not "safe"
+    if upside_pct < 0.10:
+        return 10.0
+    if upside_pct < 0.20:
+        return 7.0
+    if upside_pct < 0.35:
+        return 4.0
+    if upside_pct < 0.50:
+        return 2.0
+    return 0.0
+
+
+def _fundamental_score(fcf_yoy: float | None) -> float:
+    if fcf_yoy is None:
+        return 2.0  # unknown — mild default, not "healthy"
+    if fcf_yoy < -1.00:
+        return 10.0
+    if fcf_yoy < -0.20:
+        return 6.0
+    if fcf_yoy < 0:
+        return 3.0
+    return 0.0
+
+
+def bubble_score(
+    ath_pct: float | None,
+    upside_pct: float | None,
+    fcf_yoy: float | None,
+    moat_risk_score: float | None,
+) -> float:
+    """0-40 composite — see module docstring. moat_risk_score of None (not yet
+    researched) defaults to 5 (neutral/unknown), matching the other dimensions'
+    convention of "unknown is not the same as safe"."""
+    moat = moat_risk_score if moat_risk_score is not None else 5.0
+    return _ath_score(ath_pct) + _valuation_score(upside_pct) + _fundamental_score(fcf_yoy) + moat
+
 
 class ThemeConcentrationRule(Rule):
     name = "theme_concentration"
@@ -95,6 +159,13 @@ class ThemeConcentrationRule(Rule):
                     )
                 )
 
+                fund = ctx.market.fundamentals(symbol)
+                upside_pct = None
+                if fund.analyst_target_mean and snap is not None and not math.isnan(snap.price) and snap.price:
+                    upside_pct = fund.analyst_target_mean / snap.price - 1
+                override = ctx.tiers.override_for(symbol)
+                score = bubble_score(ath_pct, upside_pct, fund.fcf_yoy, override.moat_risk_score)
+
                 breakdown_rows.append({
                     "symbol": symbol,
                     "weight": weight,
@@ -103,11 +174,20 @@ class ThemeConcentrationRule(Rule):
                     "ath_pct": ath_pct,
                     "rsi": rsi,
                     "trim_candidate": trim_candidate,
+                    "analyst_upside_pct": upside_pct,
+                    "fcf_yoy": fund.fcf_yoy,
+                    "moat_risk_score": override.moat_risk_score,
+                    "bubble_score": score,
                 })
 
             trim_symbols = [r["symbol"] for r in breakdown_rows if r["trim_candidate"]]
             top = ", ".join(f"{s} {w:.1%}" for s, w in sorted(weights.items(), key=lambda kv: -kv[1])[:5])
             trim_note = f" Trim candidates (near ATH + strength): {', '.join(trim_symbols)}." if trim_symbols else ""
+
+            top_bubble = sorted(breakdown_rows, key=lambda r: -r["bubble_score"])[:5]
+            bubble_note = " Highest bubble-exposure score: " + ", ".join(
+                f"{r['symbol']} {r['bubble_score']:.0f}/40" for r in top_bubble
+            ) + "."
 
             alerts.append(Alert(
                 symbol=theme_name.upper(),
@@ -120,7 +200,7 @@ class ThemeConcentrationRule(Rule):
                 body=(
                     f"Basket of {len(members)} holdings totals {theme_pct:.1%} "
                     f"(${theme_pct * total:,.0f}) vs cap {bucket.cap:.0%}. "
-                    f"~${over_value:,.0f} above target. Largest: {top}.{trim_note}"
+                    f"~${over_value:,.0f} above target. Largest: {top}.{trim_note}{bubble_note}"
                 ),
                 payload={
                     "theme": theme_name,
@@ -130,9 +210,14 @@ class ThemeConcentrationRule(Rule):
                     "total_portfolio_value": total,
                     "breakdown": breakdown_rows,
                     "trim_symbols": trim_symbols,
+                    "top_bubble_score": [(r["symbol"], r["bubble_score"]) for r in top_bubble],
                 },
             ))
-            log.info("THEME ALERT %s: %.1f%% of portfolio vs %.0f%% cap (~$%.0f over) — trim candidates: %s",
-                     theme_name.upper(), theme_pct * 100, bucket.cap * 100, over_value, trim_symbols or "none")
+            log.info(
+                "THEME ALERT %s: %.1f%% of portfolio vs %.0f%% cap (~$%.0f over) — "
+                "trim candidates: %s | top bubble scores: %s",
+                theme_name.upper(), theme_pct * 100, bucket.cap * 100, over_value, trim_symbols or "none",
+                ", ".join(f"{s} {sc:.0f}" for s, sc in [(r["symbol"], r["bubble_score"]) for r in top_bubble]),
+            )
 
         return alerts

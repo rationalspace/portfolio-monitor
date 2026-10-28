@@ -35,7 +35,20 @@ def lot_analysis(positions: list, price: float, lt_rate: float, st_rate: float) 
     cutoff = date.today() - timedelta(days=_LTCG_DAYS)
     today = date.today()
     rows = []
+    seen_lot_signatures: set[tuple] = set()
     for pos in positions:
+        # SnapTrade sometimes splits one symbol across two position records (real
+        # separate sub-accounts) but returns the SECOND record's .lots as a byte-
+        # for-byte copy of the first's instead of that account's real lots (seen
+        # for AVGO, MSFT, AMD). Skip a position's lots entirely if they're an
+        # exact duplicate of a set already processed for this symbol — otherwise
+        # every gain/tax figure downstream silently doubles.
+        pos_signature = tuple(
+            (lot.acquired_on, lot.quantity, lot.cost_basis_per_share) for lot in pos.lots
+        )
+        if pos_signature and pos_signature in seen_lot_signatures:
+            continue
+        seen_lot_signatures.add(pos_signature)
         for lot in pos.lots:
             days_held = (today - lot.acquired_on).days
             is_lt = lot.acquired_on <= cutoff
