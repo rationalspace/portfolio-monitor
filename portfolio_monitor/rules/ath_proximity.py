@@ -141,6 +141,10 @@ class AthProximityRule(Rule):
             elif st_profitable:
                 body += f" Plus {st_qty:.0f} ST profitable share(s) (gain {signed_dollar(st_gain)})."
 
+            override = ctx.tiers.override_for(symbol)
+            if override.action_note:
+                body += f" Standing note: {override.action_note}"
+
             payload = {
                 "symbol": symbol,
                 "tier": tier_label,
@@ -164,6 +168,7 @@ class AthProximityRule(Rule):
                 "st_profitable_gain": st_gain,
                 "has_st_profitable_lots": bool(st_profitable),
                 "st_only": st_only,
+                "action_note": override.action_note,
             }
 
             alerts.append(Alert(
